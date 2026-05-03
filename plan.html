@@ -1,0 +1,585 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>الخطة الدراسية — المساعد الأكاديمي</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/styles.css?v=plan4" />
+</head>
+
+<body class="app" data-theme="auto" data-page="plan">
+
+  <header class="app-header">
+    <div class="container header-inner">
+      <a class="brand" href="index.html">
+        <span class="brand-logo" aria-hidden="true"></span>
+        <span class="brand-name">المساعد الأكاديمي</span>
+        <span class="badge">UQU</span>
+      </a>
+      <nav class="nav">
+        <button class="nav-toggle" aria-expanded="false">☰</button>
+        <ul id="main-menu">
+          <li><a href="dashboard.html">اللوحة</a></li>
+          <li><a href="chat.html">الدردشة</a></li>
+          <li><a href="gpa.html">المعدل</a></li>
+          <li><a href="plan.html" aria-current="page">الخطة</a></li>
+          <li><a href="pomodoro.html">بومودورو</a></li>
+          <li><a href="locations.html">القاعات</a></li>
+        </ul>
+      </nav>
+      <div class="header-actions">
+        <button id="themeToggle" class="btn-ghost">🌓</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="app-main">
+    <div class="plan-v2">
+
+      <!-- ═══════════ Compact Toolbar ═══════════ -->
+      <div class="ptb">
+        <button id="sidebarToggle" class="ptb-icon" title="إعدادات الخطة" aria-label="فتح إعدادات الخطة">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/><circle cx="9" cy="6" r="2" fill="currentColor"/><circle cx="15" cy="12" r="2" fill="currentColor"/><circle cx="9" cy="18" r="2" fill="currentColor"/></svg>
+        </button>
+
+        <div class="ptb-sep"></div>
+
+        <div class="ptb-nav">
+          <button id="weekPrev" class="ptb-nav-btn" title="الأسبوع السابق">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+          </button>
+          <span id="weekLabel" class="ptb-nav-label">الأسبوع 1</span>
+          <button id="weekNext" class="ptb-nav-btn" title="الأسبوع التالي">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+          </button>
+        </div>
+
+        <div class="ptb-sep hide-mobile"></div>
+
+        <div class="ptb-stats hide-mobile">
+          <div class="ptb-stat">
+            <span class="ptb-stat-num" id="statSessions">0</span>
+            <span class="ptb-stat-txt">جلسة</span>
+          </div>
+          <div class="ptb-stat">
+            <span class="ptb-stat-num" id="statHours">0</span>
+            <span class="ptb-stat-txt">ساعة</span>
+          </div>
+          <div class="ptb-stat">
+            <span class="ptb-stat-num" id="statStart">—</span>
+            <span class="ptb-stat-txt">البداية</span>
+          </div>
+        </div>
+
+        <div style="flex:1;min-width:8px;"></div>
+
+        <select id="courseFilter" class="ptb-select" title="تصفية حسب المادة">
+          <option value="all">كل المواد</option>
+        </select>
+
+        <button id="genBtn" class="ptb-gen" title="توليد الجدول الذكي">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+          <span>توليد</span>
+        </button>
+
+        <div class="ptb-actions">
+          <button id="copyBtn" class="ptb-icon" title="نسخ الجدول">📋</button>
+          <button id="icsBtn" class="ptb-icon" title="تصدير ICS">📆</button>
+          <button id="resetBtn" class="ptb-icon ptb-icon--danger" title="إعادة تعيين">↺</button>
+        </div>
+      </div>
+
+      <!-- ═══════════ Week Overview (Current + Next) ═══════════ -->
+      <div id="weekOverview" class="week-ov"></div>
+
+      <!-- ═══════════ AI Recommendations ═══════════ -->
+      <div id="aiRecs" class="ai-recommendations animate-block" style="display:none; background: rgba(99,102,241,0.1); border-right: 4px solid var(--accent); padding: 16px; border-radius: 8px; margin-bottom: 20px; color: var(--text-color); line-height: 1.6;"></div>
+
+      <!-- ═══════════ Plan Grid — Full Width ═══════════ -->
+      <div id="planGrid" class="plan-grid animate-block delay-1">
+        <div class="plan-empty">
+          <div class="plan-empty-icon">📅</div>
+          <h3>ابدأ خطتك الدراسية</h3>
+          <p>أنشئ خطة ذكية مخصصة لك بناءً على بيانات بروفايلك</p>
+          <div class="plan-empty-steps">
+            <div class="plan-empty-step"><span>1</span> أكمل بروفايلك</div>
+            <div class="plan-empty-step"><span>2</span> حدد أوقات المذاكرة</div>
+            <div class="plan-empty-step"><span>3</span> اضغط "توليد الجدول"</div>
+          </div>
+          <div style="display:flex;gap:12px;margin-top:24px;flex-wrap:wrap;justify-content:center;">
+            <a href="profile.html" class="btn-primary">← إعداد البروفايل</a>
+            <button onclick="window._openDrawer&&window._openDrawer()" class="btn-ghost">⚙️ فتح الإعدادات</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- ═══════════ Drawer Backdrop ═══════════ -->
+  <div id="drawerBackdrop" class="drawer-backdrop"></div>
+
+  <!-- ═══════════ Drawer Sidebar — v3 Robust Rebuild ═══════════ -->
+  <aside id="planDrawer" class="drawer-panel" role="dialog" aria-label="إعدادات الخطة">
+
+    <div class="drawer-head">
+      <h3>⚙️ إعدادات الخطة</h3>
+      <button id="drawerCloseBtn" class="drawer-close" aria-label="إغلاق">✕</button>
+    </div>
+
+    <div class="drawer-body">
+
+      <!-- ── 1. Plan Title ── -->
+      <div class="drawer-section open">
+        <div class="drawer-section-head">
+          <span class="drawer-section-title">
+            <span class="drawer-section-icon">📋</span> عنوان الخطة
+          </span>
+          <svg class="drawer-section-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+        </div>
+        <div class="drawer-section-body">
+          <div class="drawer-section-content">
+            <input type="text" id="planTitle" placeholder="خطة دراسة الفصل الدراسي" />
+          </div>
+        </div>
+      </div>
+
+      <!-- ── 2. Courses ── -->
+      <div class="drawer-section open">
+        <div class="drawer-section-head">
+          <span class="drawer-section-title">
+            <span class="drawer-section-icon">📚</span> المواد الدراسية
+            <span class="drawer-section-count" id="coursesCount">0</span>
+          </span>
+          <svg class="drawer-section-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+        </div>
+        <div class="drawer-section-body">
+          <div class="drawer-section-content">
+            <!-- Hidden inputs for JS course-add logic -->
+            <input type="text" id="courseName" style="display:none" />
+            <input type="color" id="courseColor" value="#6366f1" style="display:none" />
+            <input type="number" id="courseCurrent" style="display:none" />
+            <input type="number" id="coursePerSession" style="display:none" />
+            <input type="number" id="courseWeekly" style="display:none" />
+            <input type="date" id="courseExam" style="display:none" />
+            <div id="coursesList">
+              <p style="font-size:.78rem;text-align:center;padding:12px 0;color:var(--muted);">
+                لا توجد مواد.
+                <a href="profile.html" style="color:var(--accent);font-weight:600;">أضف من البروفايل ←</a>
+              </p>
+            </div>
+            <button id="addCourseBtn" class="btn-primary" style="display:none;">+ إضافة مادة</button>
+            <div id="courseFilter-wrap" style="display:none"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── 3. Study Slots ── -->
+      <div class="drawer-section open">
+        <div class="drawer-section-head">
+          <span class="drawer-section-title">
+            <span class="drawer-section-icon">⏰</span> أوقات المذاكرة
+            <span class="drawer-section-count" id="slotsCount">0</span>
+          </span>
+          <svg class="drawer-section-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+        </div>
+        <div class="drawer-section-body">
+          <div class="drawer-section-content">
+            <div id="chipsBox" class="slot-chips"></div>
+            <div class="add-slot-grid">
+              <div class="drawer-field">
+                <label class="drawer-lbl">اليوم</label>
+                <select id="daySel">
+                  <option>الأحد</option><option>الإثنين</option><option>الثلاثاء</option>
+                  <option>الأربعاء</option><option>الخميس</option><option>الجمعة</option><option>السبت</option>
+                </select>
+              </div>
+              <div class="drawer-field">
+                <label class="drawer-lbl">الوقت من</label>
+                <input type="time" id="fromTime" value="18:00" />
+              </div>
+              <div class="drawer-field full-col">
+                <label class="drawer-lbl">المكان (اختياري)</label>
+                <input type="text" id="placeInput" placeholder="المكتبة، البيت..." />
+              </div>
+              <div class="full-col">
+                <button id="addSlotBtn" class="btn-ghost">+ إضافة وقت</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── 4. Tasks & Exams ── -->
+      <div class="drawer-section open">
+        <div class="drawer-section-head">
+          <span class="drawer-section-title">
+            <span class="drawer-section-icon">📌</span> مهام واختبارات
+            <span class="drawer-section-count" id="tasksCount">0</span>
+          </span>
+          <svg class="drawer-section-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+        </div>
+        <div class="drawer-section-body">
+          <div class="drawer-section-content">
+
+            <div class="drawer-field">
+              <label class="drawer-lbl">عنوان المهمة</label>
+              <input type="text" id="taskTitle" placeholder="مثل: اختبار هياكل البيانات" />
+            </div>
+
+            <div class="drawer-row">
+              <div class="drawer-field">
+                <label class="drawer-lbl">النوع</label>
+                <select id="taskType">
+                  <option value="exam">اختبار</option>
+                  <option value="quiz">كويز</option>
+                  <option value="assignment">واجب</option>
+                  <option value="project">مشروع</option>
+                  <option value="other">أخرى</option>
+                </select>
+              </div>
+              <div class="drawer-field">
+                <label class="drawer-lbl">المادة</label>
+                <select id="taskCourse">
+                  <option value="">— غير مرتبط —</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="drawer-row">
+              <div class="drawer-field">
+                <label class="drawer-lbl">اليوم</label>
+                <select id="taskDay">
+                  <option>الأحد</option><option>الإثنين</option><option>الثلاثاء</option>
+                  <option>الأربعاء</option><option>الخميس</option><option>الجمعة</option><option>السبت</option>
+                </select>
+              </div>
+              <div class="drawer-field">
+                <label class="drawer-lbl">الوقت</label>
+                <input type="time" id="taskTime" value="10:00" />
+              </div>
+            </div>
+
+            <div class="drawer-field">
+              <label class="drawer-lbl">المدة (دقائق)</label>
+              <input type="number" id="taskDuration" value="60" min="15" step="15" />
+            </div>
+
+            <div class="drawer-field">
+              <label class="drawer-lbl">تاريخ الموعد / الاختبار</label>
+              <div class="drawer-row">
+                <input type="date" id="taskDeadlineDate" />
+                <input type="time" id="taskDeadlineTime" />
+              </div>
+              <div class="deadline-info" id="deadlineInfoRow" style="display:none;">
+                <span>📅</span>
+                <span>يوم الأسبوع: <strong id="deadlineWeekday">—</strong></span>
+              </div>
+            </div>
+
+            <button id="addTaskBtn" class="btn-primary">📌 إضافة للخطة</button>
+
+            <div id="tasksMiniList">
+              <span style="font-size:.76rem;color:var(--muted);">لا توجد مهام بعد.</span>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /drawer-body -->
+
+    <!-- Fixed Footer -->
+    <div class="drawer-footer">
+      <button id="genBtnDrawer" class="btn-primary">
+        <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+        ✨ توليد الجدول الذكي
+      </button>
+      <button id="drawerCloseFooterBtn" class="btn-ghost">✕ إغلاق</button>
+    </div>
+
+  </aside>
+
+  <!-- Drawer open/close + accordion logic — v3 -->
+  <script>
+  (function(){
+    var drawer   = null;
+    var backdrop = null;
+
+    /* ── Open / Close ── */
+    function open(){
+      if(!drawer)   drawer   = document.getElementById('planDrawer');
+      if(!backdrop) backdrop = document.getElementById('drawerBackdrop');
+      if(drawer)   drawer.classList.add('open');
+      if(backdrop) backdrop.classList.add('open');
+      document.body.classList.add('drawer-open');
+      // Scroll body to top
+      var body = drawer && drawer.querySelector('.drawer-body');
+      if(body) body.scrollTop = 0;
+    }
+
+    function close(){
+      if(!drawer)   drawer   = document.getElementById('planDrawer');
+      if(!backdrop) backdrop = document.getElementById('drawerBackdrop');
+      if(drawer)   drawer.classList.remove('open');
+      if(backdrop) backdrop.classList.remove('open');
+      document.body.classList.remove('drawer-open');
+    }
+
+    window._openDrawer  = open;
+    window._closeDrawer = close;
+
+    document.addEventListener('DOMContentLoaded', function(){
+      drawer   = document.getElementById('planDrawer');
+      backdrop = document.getElementById('drawerBackdrop');
+
+      /* ── Trigger buttons ── */
+      var tog = document.getElementById('sidebarToggle');
+      if(tog) tog.addEventListener('click', open);
+
+      var cls = document.getElementById('drawerCloseBtn');
+      if(cls) cls.addEventListener('click', close);
+
+      var clsF = document.getElementById('drawerCloseFooterBtn');
+      if(clsF) clsF.addEventListener('click', close);
+
+      if(backdrop) backdrop.addEventListener('click', close);
+
+      /* ESC key */
+      document.addEventListener('keydown', function(e){
+        if(e.key === 'Escape') close();
+      });
+
+      /* ── Accordion Sections — CSS grid-template-rows animation ── */
+      document.querySelectorAll('.drawer-section-head').forEach(function(head){
+        head.addEventListener('click', function(e){
+          // Don't toggle if user clicked an interactive child (link, button, input)
+          if(e.target.closest('a, button, input, select, textarea')) return;
+
+          var section = head.closest('.drawer-section');
+          if(!section) return;
+          var wasOpen = section.classList.contains('open');
+          section.classList.toggle('open');
+
+          // Smooth scroll into view when opening
+          if(!wasOpen){
+            var body = drawer && drawer.querySelector('.drawer-body');
+            if(body){
+              setTimeout(function(){
+                var rect = section.getBoundingClientRect();
+                var bodyRect = body.getBoundingClientRect();
+                var scrollOffset = rect.top - bodyRect.top + body.scrollTop - 8;
+                body.scrollTo({ top: scrollOffset, behavior: 'smooth' });
+              }, 80);
+            }
+          }
+        });
+      });
+
+      /* ── Generate button in footer → triggers main gen button ── */
+      var genFooter = document.getElementById('genBtnDrawer');
+      var genMain   = document.getElementById('genBtn');
+      if(genFooter && genMain){
+        genFooter.addEventListener('click', function(){
+          close();
+          setTimeout(function(){ genMain.click(); }, 320);
+        });
+      }
+
+      /* ── Deadline weekday display ── */
+      function updateDeadlineDisplay(){
+        var dateInput = document.getElementById('taskDeadlineDate');
+        var row = document.getElementById('deadlineInfoRow');
+        var wd  = document.getElementById('deadlineWeekday');
+        if(!dateInput || !row || !wd) return;
+
+        var dateVal = dateInput.value;
+        if(!dateVal){ row.style.display = 'none'; return; }
+
+        var days = ['الأحد','الإثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+        var d = new Date(dateVal + 'T00:00:00');
+        if(isNaN(d.getTime())){ row.style.display = 'none'; return; }
+
+        wd.textContent = days[d.getDay()] || '—';
+        row.style.display = 'flex';
+      }
+
+      var dld = document.getElementById('taskDeadlineDate');
+      if(dld) dld.addEventListener('change', updateDeadlineDisplay);
+    });
+  })();
+  </script>
+
+  <!-- Drawer section counters — safe debounced update (no infinite loop) -->
+  <script>
+  (function(){
+    var _timer = null;
+    var _busy  = false;
+
+    function updateDrawerCounts(){
+      if(_busy) return;          // prevent re-entrant calls
+      _busy = true;
+      try {
+        var cCount = document.querySelectorAll('#coursesList .course-row').length;
+        var cBadge = document.getElementById('coursesCount');
+        if(cBadge && cBadge.textContent !== String(cCount)) cBadge.textContent = cCount || '0';
+
+        var sCount = document.querySelectorAll('#chipsBox .slot-chip').length;
+        var sBadge = document.getElementById('slotsCount');
+        if(sBadge && sBadge.textContent !== String(sCount)) sBadge.textContent = sCount || '0';
+
+        var tCount = document.querySelectorAll('#tasksMiniList .task-mini-item').length;
+        var tBadge = document.getElementById('tasksCount');
+        if(tBadge && tBadge.textContent !== String(tCount)) tBadge.textContent = tCount || '0';
+      } finally {
+        _busy = false;
+      }
+    }
+
+    function scheduleUpdate(){
+      clearTimeout(_timer);
+      _timer = setTimeout(updateDrawerCounts, 120);
+    }
+
+    document.addEventListener('DOMContentLoaded', function(){
+      // Only watch the content areas — NOT the count badges themselves
+      var targets = [
+        document.getElementById('coursesList'),
+        document.getElementById('chipsBox'),
+        document.getElementById('tasksMiniList')
+      ];
+      var obs = new MutationObserver(scheduleUpdate);
+      targets.forEach(function(t){
+        if(t) obs.observe(t, { childList: true, subtree: false });
+      });
+      updateDrawerCounts();
+    });
+  })();
+  </script>
+
+  <link rel="manifest" href="manifest.json" />
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script src="assets/firebase-config.js"></script>
+
+  <!-- Keyboard shortcut hint -->
+  <div id="shortcut-hint">اضغط <kbd>⌘K</kbd> للبحث السريع</div>
+
+  <!-- Core libraries -->
+  <script src="assets/core.js" defer></script>
+  <script src="assets/data-bridge.js" defer></script>
+  <script src="assets/auth.js" defer></script>
+  <script src="assets/firebase-auth.js" defer></script>
+  <script src="assets/firebase-db.js" defer></script>
+  <script src="assets/notifications.js" defer></script>
+  <script src="assets/student-model.js" defer></script>
+  <script src="assets/engine.js" defer></script>
+  <script src="assets/actions.js" defer></script>
+  <!-- AI + Effects -->
+  <script src="assets/ai.js" defer></script>
+  <script src="assets/effects.js" defer></script>
+  <script src="assets/charts.js" defer></script>
+  <script src="assets/ux.js" defer></script>
+  <!-- App logic -->
+  <script src="assets/achievements.js" defer></script>
+  <script src="assets/data-io.js" defer></script>
+  <script src="assets/profile-guard.js" defer></script>
+  <script src="assets/plan-generator.js" defer></script>
+  <script src="assets/app.js" defer></script>
+  <script>
+    // Register Service Worker (PWA)
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(() => {});
+      });
+    }
+  </script>
+  <script src="assets/ai-fab.js" defer></script>
+  <script src="assets/pomodoro.js" defer></script>
+
+  <!-- ═══════════ Focus Mode Modal (Pomodoro v2) ═══════════ -->
+  <div id="focusModal" class="focus-modal">
+    <div class="focus-modal-content">
+      <div class="focus-header">
+        <span id="focusCourseName">المادة الحالية</span>
+        <button id="focusCloseBtn" class="focus-close">✕</button>
+      </div>
+
+      <div class="focus-timer-container">
+        <svg class="focus-progress-svg" viewBox="0 0 300 300">
+          <circle class="focus-progress-bg" cx="150" cy="150" r="140"></circle>
+          <circle id="focusProgressCircle" class="focus-progress-fill" cx="150" cy="150" r="140"></circle>
+        </svg>
+        <div id="focusTimerDisplay" class="focus-timer-val">25:00</div>
+      </div>
+
+      <div class="focus-actions">
+        <button id="focusStartBtn" class="focus-btn-primary">إيقاف مؤقت</button>
+      </div>
+      
+      <p class="focus-hint">ابقَ مركزاً.. النجاح يبدأ هنا 🚀</p>
+    </div>
+  </div>
+
+  <style>
+    .focus-modal {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(10, 11, 30, 0.95); backdrop-filter: blur(20px);
+      z-index: 10000; display: none; align-items: center; justify-content: center;
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); opacity: 0;
+    }
+    .focus-modal.active { display: flex; opacity: 1; }
+    .focus-modal-content {
+      width: 100%; max-width: 500px; text-align: center; color: white; padding: 20px;
+      transform: translateY(30px); transition: transform 0.5s ease;
+    }
+    .focus-modal.active .focus-modal-content { transform: translateY(0); }
+    
+    .focus-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px; }
+    #focusCourseName { font-size: 1.25rem; font-weight: 800; color: var(--accent); }
+    .focus-close { background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer; opacity: 0.5; transition: 0.2s; }
+    .focus-close:hover { opacity: 1; transform: rotate(90deg); }
+
+    .focus-timer-container { position: relative; width: 300px; height: 300px; margin: 0 auto 50px; }
+    .focus-progress-svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+    .focus-progress-bg { fill: none; stroke: rgba(255,255,255,0.05); stroke-width: 8; }
+    .focus-progress-fill {
+      fill: none; stroke: var(--accent); stroke-width: 10; stroke-linecap: round;
+      stroke-dasharray: 880; stroke-dashoffset: 0; transition: stroke-dashoffset 1s linear;
+      filter: drop-shadow(0 0 10px var(--accent));
+    }
+    .focus-timer-val {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      font-size: 4rem; font-weight: 900; font-family: monospace; letter-spacing: -2px;
+    }
+
+    .focus-btn-primary {
+      background: var(--accent); border: none; color: white; padding: 16px 48px;
+      border-radius: 99px; font-size: 1.1rem; font-weight: 800; cursor: pointer;
+      transition: all 0.3s ease; box-shadow: 0 10px 30px rgba(99,102,241,0.4);
+    }
+    .focus-btn-primary:active { transform: scale(0.95); }
+    .focus-btn-primary.running { background: rgba(255,255,255,0.1); box-shadow: none; border: 1px solid rgba(255,255,255,0.2); }
+    
+    .focus-hint { margin-top: 40px; color: var(--muted); font-size: 0.9rem; letter-spacing: 1px; }
+
+    /* Task Card Focus Button */
+    .task-focus-btn {
+      width: 100%; margin-top: 12px; padding: 10px;
+      background: var(--surface-2); border: 1px dashed var(--accent);
+      border-radius: 8px; color: var(--accent); font-weight: 700;
+      font-size: 0.85rem; cursor: pointer; transition: all 0.2s;
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+    }
+    .task-focus-btn:hover { background: var(--accent-dim); border-style: solid; box-shadow: 0 4px 12px rgba(99,102,241,0.15); }
+    .task-done .task-focus-btn { display: none; }
+  </style>
+
+  <!-- Neon Grid Background -->
+</body>
+</html>

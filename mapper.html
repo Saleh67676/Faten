@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <title>أداة رسم الخرائط الذكية - ربط الأبواب</title>
+  <style>
+    body { margin: 0; display: flex; height: 100vh; font-family: Tahoma, Arial; background: #0f172a; color: white; overflow: hidden; }
+    
+    /* القائمة الجانبية */
+    #sidebar { width: 340px; background: #1e293b; padding: 20px; display: flex; flex-direction: column; gap: 15px; border-left: 2px solid #334155; overflow-y: auto; z-index: 100; box-shadow: -5px 0 15px rgba(0,0,0,0.5); }
+    h2 { margin: 0; color: #38bdf8; text-align: center; font-size: 1.3rem; }
+    
+    .btn-main { background: #0ea5e9; color: white; padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 1rem; transition: 0.2s; box-shadow: 0 0 10px rgba(14,165,233,0.3); }
+    .btn-main:hover { background: #0284c7; }
+    
+    .instructions { background: #020617; padding: 12px; border-radius: 8px; font-size: 13px; color: #cbd5e1; line-height: 1.6; border: 1px dashed #475569; }
+    
+    /* لوحة التعديل (القاعة المحددة) */
+    #edit-panel { display: none; background: #0f172a; padding: 15px; border-radius: 8px; margin-top: 10px; border: 1px solid #334155; box-shadow: inset 0 0 10px rgba(0,0,0,0.5); }
+    .form-group { display: flex; flex-direction: column; gap: 5px; margin-top: 10px; }
+    input, select { padding: 10px; border-radius: 5px; border: 1px solid #475569; background: #1e293b; color: white; font-weight: bold; }
+    input:focus, select:focus { outline: none; border-color: #38bdf8; }
+    
+    /* أزرار العمليات */
+    .btn-add-door { background: #f59e0b; color: white; padding: 10px; border: none; border-radius: 5px; cursor: pointer; margin-top: 15px; font-weight: bold; width: 100%; transition: 0.2s; }
+    .btn-add-door:hover { background: #d97706; }
+    .btn-save { background: #10b981; color: white; padding: 10px; border: none; border-radius: 5px; cursor: pointer; margin-top: 10px; font-weight: bold; }
+    .btn-delete { background: #ef4444; color: white; padding: 10px; border: none; border-radius: 5px; cursor: pointer; margin-top: 5px; font-weight: bold;}
+    .btn-export { background: #8b5cf6; color: white; padding: 15px; border: none; border-radius: 8px; cursor: pointer; font-size: 1.1rem; font-weight: bold; margin-top: auto; }
+    
+    textarea { width: 100%; height: 100px; background: #000; color: #10b981; padding: 10px; border-radius: 5px; border: 1px solid #555; direction: ltr; font-family: monospace; font-size: 12px; resize: none; box-sizing: border-box; }
+
+    /* مساحة العمل والخريطة */
+    #workspace { flex: 1; overflow: hidden; position: relative; background: #000; }
+    #map-container { position: absolute; top: 0; left: 0; box-shadow: 0 0 30px rgba(0,0,0,0.8); transform-origin: 0 0; }
+    #map-image { display: block; user-select: none; pointer-events: auto; opacity: 0.85; }
+    #svg-overlay { position: absolute; top: 0; left: 0; z-index: 10; pointer-events: auto; transform-origin: 0 0; }
+
+    /* تنسيق القاعات (المضلعات) */
+    .drawn-polygon { fill: rgba(56, 189, 248, 0.25); stroke: #38bdf8; stroke-width: 2; cursor: pointer; pointer-events: all; transition: 0.2s; }
+    .drawn-polygon:hover { fill: rgba(56, 189, 248, 0.5); stroke-width: 3; }
+    .drawn-polygon.selected { fill: rgba(16, 185, 129, 0.3); stroke: #10b981; stroke-width: 4; filter: drop-shadow(0 0 8px rgba(16,185,129,0.5)); }
+    
+    /* تنسيق الأبواب المرتبطة */
+    .door-marker { pointer-events: none; }
+    .door-marker circle { fill: #f59e0b; stroke: #fff; stroke-width: 2; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5)); }
+    .door-marker text { font-size: 11px; fill: white; font-weight: bold; text-shadow: 1px 1px 2px black; }
+
+    /* شريط إنهاء الرسم الثابت (الحل الجذري لمشكلة الضغط) */
+    #finish-bar { position: fixed; bottom: -100px; left: 50%; transform: translateX(-50%); background: #10b981; color: white; padding: 15px 40px; border-radius: 30px; font-size: 1.2rem; font-weight: bold; cursor: pointer; z-index: 1000; box-shadow: 0 10px 25px rgba(0,0,0,0.5); border: 2px solid #059669; transition: bottom 0.3s ease-out; }
+    #finish-bar.show { bottom: 40px; }
+    #finish-bar:hover { background: #059669; transform: translateX(-50%) scale(1.05); }
+
+    /* رسالة التوجيه العائمة */
+    #toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #f59e0b; color: white; padding: 10px 20px; border-radius: 20px; font-weight: bold; z-index: 1000; display: none; box-shadow: 0 4px 10px rgba(0,0,0,0.5); pointer-events: none; }
+  </style>
+</head>
+<body>
+
+  <div id="sidebar">
+    <h2>أداة الخرائط الذكية 🗺️</h2>
+    
+    <button class="btn-main" id="btn-draw-room">🔶 رسم قاعة جديدة</button>
+
+    <div class="instructions" id="main-inst">
+      <strong>طريقة العمل:</strong><br>
+      1. اضغط على زر "رسم قاعة" بالأعلى.<br>
+      2. انقر على الخريطة لتحديد زوايا القاعة.<br>
+      3. اضغط على الشريط الأخضر الكبير أسفل الشاشة لإنهاء القاعة.<br>
+      4. بعد تحديد القاعة، يمكنك إضافة أبواب لها.
+    </div>
+
+    <div id="edit-panel">
+      <h3 style="margin-top: 0; font-size: 16px; color: #e2e8f0; border-bottom: 1px solid #334155; padding-bottom: 8px;">بيانات القاعة</h3>
+      <div class="form-group">
+        <label>المعرف (ID):</label>
+        <input type="text" id="item-id" placeholder="مثال: G01">
+      </div>
+      <div class="form-group">
+        <label>الاسم التوضيحي:</label>
+        <input type="text" id="item-label" placeholder="مثال: قاعة G01">
+      </div>
+      <div class="form-group">
+        <label>النوع:</label>
+        <select id="item-type">
+          <option value="classroom">قاعة دراسية</option>
+          <option value="office">مكتب</option>
+          <option value="admin">إدارة</option>
+          <option value="stairs">درج / مصعد</option>
+          <option value="wc">دورة مياه</option>
+          <option value="amphitheater">مدرج</option>
+        </select>
+      </div>
+      
+      <button class="btn-add-door" id="btn-add-door">🚪 إضافة باب لهذه القاعة</button>
+      
+      <button class="btn-save" id="btn-save" style="width:100%">💾 حفظ التعديلات</button>
+      <button class="btn-delete" id="btn-delete" style="width:100%">🗑️ حذف القاعة بالكامل</button>
+    </div>
+
+    <button class="btn-export" id="btn-export">🚀 تصدير الكود الجاهز</button>
+    <textarea id="export-code" readonly placeholder="سيظهر الكود الجاهز هنا بعد التصدير..."></textarea>
+  </div>
+
+  <div id="workspace">
+    <div id="map-container">
+      <img id="map-image" src="assets/base-map.jpg" alt="Map">
+      <svg id="svg-overlay"></svg>
+    </div>
+  </div>
+
+  <div id="finish-bar">✅ إنهاء رسم القاعة</div>
+  
+  <div id="toast">ℹ️ انقر على الخريطة لتحديد مكان الباب...</div>
+
+  <script>
+    const svg = document.getElementById('svg-overlay');
+    const container = document.getElementById('map-container');
+    const img = document.getElementById('map-image');
+    const workspace = document.getElementById('workspace');
+    const finishBar = document.getElementById('finish-bar');
+    const toast = document.getElementById('toast');
+    
+    // حالات النظام: 'IDLE', 'DRAWING_ROOM', 'ADDING_DOOR'
+    let state = 'IDLE'; 
+    
+    let rooms = []; // المصفوفة الرئيسية للقاعات { polyNode, points, doors: [], data: {} }
+    let currentPolyPoints = [];
+    let tempPolyLine = null;
+    let tempPointsGroup = null;
+    let selectedRoom = null;
+    let isPanning = false;
+    let panStart = { x: 0, y: 0 };
+    let panOffset = { x: 0, y: 0 };
+    let zoomLevel = 1;
+    let imgDisplayWidth = 0;
+    let imgDisplayHeight = 0;
+    
+    // تحويل إحداثيات الشاشة إلى SVG
+    function screenToSVG(screenX, screenY) {
+      const containerRect = container.getBoundingClientRect();
+      const x = (screenX - containerRect.left) / zoomLevel;
+      const y = (screenY - containerRect.top) / zoomLevel;
+      return { x, y };
+    }
+    
+    function updateTransform() {
+      container.style.transform = `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoomLevel})`;
+      svg.style.transform = `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoomLevel})`;
+    }
+
+    // --- 1. بدء رسم القاعة ---
+    document.getElementById('btn-draw-room').addEventListener('click', () => {
+      state = 'DRAWING_ROOM';
+      currentPolyPoints = [];
+      deselectRoom();
+      svg.style.cursor = 'crosshair';
+      document.getElementById('btn-draw-room').style.background = '#0284c7';
+      document.getElementById('btn-draw-room').textContent = '📍 جاري الرسم...';
+    });
+
+    // --- 2. التقاط النقاط على الخريطة ---
+    svg.addEventListener('mousedown', (e) => {
+      if (e.button !== 0) return; // رسم فقط بالزر الأيسر
+      const { x, y } = screenToSVG(e.clientX, e.clientY);
+
+      if (state === 'DRAWING_ROOM') {
+        // لا ترسم إذا ضغط على قاعة سابقة
+        if (e.target.closest('.drawn-polygon')) return;
+        
+        currentPolyPoints.push({x, y});
+        drawTempPolygon(e.clientX, e.clientY);
+        
+        // إظهار شريط الإنهاء الكبير إذا كان هناك نقطتين أو أكثر
+        if (currentPolyPoints.length >= 2) {
+          finishBar.classList.add('show');
+          finishBar.textContent = `✅ إنهاء رسم القاعة (${currentPolyPoints.length} نقاط)`;
+        }
+      } 
+      else if (state === 'ADDING_DOOR' && selectedRoom) {
+        // إضافة الباب للقاعة المحددة
+        addDoorToRoom(selectedRoom, x, y);
+        resetState();
+      }
+    });
+
+    // تحديث الخط الوهمي للرسم
+    window.addEventListener('mousemove', (e) => {
+      if (state === 'DRAWING_ROOM' && currentPolyPoints.length > 0 && !isPanning) {
+        drawTempPolygon(e.clientX, e.clientY);
+      }
+    });
+    
+    // التحكم في التحريك (Pan) بالماوس
+    workspace.addEventListener('contextmenu', (e) => e.preventDefault());
+    
+    workspace.addEventListener('mousedown', (e) => {
+      if (e.button !== 2 && e.button !== 1) return; // كليك يميني أو أوسط
+      e.preventDefault();
+      isPanning = true;
+      panStart = { x: e.clientX, y: e.clientY };
+      workspace.style.cursor = 'grabbing';
+    });
+    
+    window.addEventListener('mousemove', (e) => {
+      if (isPanning) {
+        const dx = e.clientX - panStart.x;
+        const dy = e.clientY - panStart.y;
+        panOffset.x += dx;
+        panOffset.y += dy;
+        panStart = { x: e.clientX, y: e.clientY };
+        updateTransform();
+      }
+    });
+    
+    window.addEventListener('mouseup', () => {
+      if (isPanning) {
+        isPanning = false;
+        workspace.style.cursor = state === 'DRAWING_ROOM' ? 'crosshair' : 'default';
+      }
+    });
+    
+    // التكبير والتصغير بـ Scroll
+    workspace.addEventListener('wheel', (e) => {
+      if (state === 'DRAWING_ROOM') return;
+      e.preventDefault();
+      const rect = workspace.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+      
+      const delta = e.deltaY > 0 ? 0.9 : 1.1;
+      const newZoom = Math.max(0.5, Math.min(3, zoomLevel * delta));
+      
+      panOffset.x = mouseX - (mouseX - panOffset.x) * (newZoom / zoomLevel);
+      panOffset.y = mouseY - (mouseY - panOffset.y) * (newZoom / zoomLevel);
+      zoomLevel = newZoom;
+      updateTransform();
+    }, { passive: false });
+
+    // --- 3. إنهاء رسم القاعة (عبر الشريط الثابت) ---
+    finishBar.addEventListener('mousedown', (e) => {
+      e.stopPropagation();
+      if (currentPolyPoints.length >= 3) {
+        finishPolygon();
+      } else {
+        alert('يجب وضع 3 زوايا على الأقل لتكوين قاعة!');
+      }
+    });
+
+    // رسم الخطوط الوهمية
+    function drawTempPolygon(mouseX, mouseY) {
+      if (!tempPolyLine) {
+        tempPolyLine = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+        tempPolyLine.setAttribute('fill', 'none');
+        tempPolyLine.setAttribute('stroke', '#38bdf8');
+        tempPolyLine.setAttribute('stroke-dasharray', '5,5');
+        tempPolyLine.setAttribute('stroke-width', '2');
+        tempPolyLine.setAttribute('pointer-events', 'none');
+        svg.appendChild(tempPolyLine);
+      }
+      if (!tempPointsGroup) {
+        tempPointsGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        tempPointsGroup.setAttribute('pointer-events', 'none');
+        svg.appendChild(tempPointsGroup);
+      }
+      
+      const mousePoint = screenToSVG(mouseX, mouseY);
+      const linePts = currentPolyPoints.concat([mousePoint]).map(p => `${p.x},${p.y}`).join(' ');
+      tempPolyLine.setAttribute('points', linePts);
+
+      while (tempPointsGroup.firstChild) tempPointsGroup.removeChild(tempPointsGroup.firstChild);
+      currentPolyPoints.forEach((p, idx) => {
+        const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        c.setAttribute('cx', p.x);
+        c.setAttribute('cy', p.y);
+        c.setAttribute('r', idx === 0 ? 4.5 : 3.5);
+        c.setAttribute('fill', '#38bdf8');
+        c.setAttribute('stroke', '#0f172a');
+        c.setAttribute('stroke-width', '1.5');
+        tempPointsGroup.appendChild(c);
+      });
+    }
+
+    // بناء القاعة وتخزينها
+    function finishPolygon() {
+      finishBar.classList.remove('show');
+      if (tempPolyLine) { tempPolyLine.remove(); tempPolyLine = null; }
+      if (tempPointsGroup) { tempPointsGroup.remove(); tempPointsGroup = null; }
+      
+      // إنشاء كائن المجموعة (Group) ليحتوي القاعة وأبوابها
+      const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      
+      // إنشاء المضلع
+      const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+      const ptsString = currentPolyPoints.map(p => `${p.x},${p.y}`).join(' ');
+      poly.setAttribute('points', ptsString);
+      poly.setAttribute('class', 'drawn-polygon');
+      group.appendChild(poly);
+      svg.appendChild(group);
+
+      const roomObj = {
+        groupNode: group,
+        polyNode: poly,
+        points: [...currentPolyPoints],
+        doors: [], // <--- مصفوفة الأبواب بداخل القاعة
+        data: { id: 'Room_' + rooms.length, label: 'قاعة جديدة', type: 'classroom' }
+      };
+      
+      rooms.push(roomObj);
+      
+      // حدث تحديد القاعة
+      poly.addEventListener('mousedown', (e) => { 
+        if(state === 'DRAWING_ROOM' || state === 'ADDING_DOOR') return;
+        e.stopPropagation(); 
+        selectRoom(roomObj); 
+      });
+      
+      resetState();
+      selectRoom(roomObj);
+    }
+
+    // --- 4. نظام إضافة الأبواب المرتبطة ---
+    document.getElementById('btn-add-door').addEventListener('click', () => {
+      if (!selectedRoom) return;
+      state = 'ADDING_DOOR';
+      svg.style.cursor = 'crosshair';
+      toast.style.display = 'block'; // إظهار التنبيه
+    });
+
+    function addDoorToRoom(room, x, y) {
+      // حفظ بيانات الباب داخل القاعة
+      const doorData = { x: x, y: y };
+      room.doors.push(doorData);
+      
+      // رسم شكل الباب ووضعه داخل مجموعة القاعة (Group) ليرتبطان بصرياً
+      const doorG = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      doorG.setAttribute('class', 'door-marker');
+      doorG.setAttribute('transform', `translate(${x}, ${y})`);
+      
+      const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      circle.setAttribute('cx', 0); circle.setAttribute('cy', 0); circle.setAttribute('r', 6);
+      doorG.appendChild(circle);
+
+      const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      text.setAttribute('x', 8); text.setAttribute('y', 4);
+      text.textContent = '🚪';
+      doorG.appendChild(text);
+
+      room.groupNode.appendChild(doorG);
+    }
+
+    // --- 5. التحديد والتعديل ---
+    const editPanel = document.getElementById('edit-panel');
+    const inputId = document.getElementById('item-id');
+    const inputLabel = document.getElementById('item-label');
+    const inputType = document.getElementById('item-type');
+
+    function selectRoom(roomObj) {
+      rooms.forEach(r => r.polyNode.classList.remove('selected'));
+      selectedRoom = roomObj;
+      roomObj.polyNode.classList.add('selected');
+      
+      inputId.value = roomObj.data.id;
+      inputLabel.value = roomObj.data.label;
+      inputType.value = roomObj.data.type;
+      editPanel.style.display = 'block';
+      inputLabel.focus();
+    }
+
+    function deselectRoom() {
+      rooms.forEach(r => r.polyNode.classList.remove('selected'));
+      selectedRoom = null;
+      editPanel.style.display = 'none';
+    }
+
+       function resetState() {
+      state = 'IDLE';
+      currentPolyPoints = [];
+      finishBar.classList.remove('show');
+      toast.style.display = 'none';
+      svg.style.cursor = 'default';
+      document.getElementById('btn-draw-room').style.background = '#0ea5e9';
+      document.getElementById('btn-draw-room').textContent = '🔶 رسم قاعة جديدة';
+      if (tempPolyLine) { tempPolyLine.remove(); tempPolyLine = null; }
+      if (tempPointsGroup) { tempPointsGroup.remove(); tempPointsGroup = null; }
+    }
+
+    // --- توسيط الخريطة وتزامن SVG ---
+    function syncOverlaySize() {
+      imgDisplayWidth = img.clientWidth;
+      imgDisplayHeight = img.clientHeight;
+      
+      svg.setAttribute('width', img.naturalWidth);
+      svg.setAttribute('height', img.naturalHeight);
+      svg.setAttribute('viewBox', `0 0 ${img.naturalWidth} ${img.naturalHeight}`);
+      
+      container.style.width = imgDisplayWidth + 'px';
+      container.style.height = imgDisplayHeight + 'px';
+      
+      // توسيط الخريطة
+      const centerX = (workspace.clientWidth - imgDisplayWidth) / 2;
+      const centerY = (workspace.clientHeight - imgDisplayHeight) / 2;
+      panOffset = { x: centerX, y: centerY };
+      zoomLevel = 1;
+      updateTransform();
+    }
+
+    img.addEventListener('load', syncOverlaySize);
+    if (img.complete) setTimeout(syncOverlaySize, 100);
+    window.addEventListener('resize', syncOverlaySize);
+
+    document.getElementById('btn-save').addEventListener('click', () => {
+      if (!selectedRoom) return;
+      selectedRoom.data.id = inputId.value;
+      selectedRoom.data.label = inputLabel.value;
+      selectedRoom.data.type = inputType.value;
+      const btn = document.getElementById('btn-save');
+      btn.textContent = '✅ تم الحفظ!';
+      setTimeout(() => btn.textContent = '💾 حفظ التعديلات', 1500);
+    });
+
+    document.getElementById('btn-delete').addEventListener('click', () => {
+      if (!selectedRoom) return;
+      selectedRoom.groupNode.remove(); // يحذف القاعة وأبوابها المرتبطة
+      rooms = rooms.filter(r => r !== selectedRoom);
+      deselectRoom();
+    });
+
+    // --- 6. التصدير المتقدم (نسب مئوية + أبواب متداخلة) ---
+    document.getElementById('btn-export').addEventListener('click', () => {
+      const imgW = img.naturalWidth;
+      const imgH = img.naturalHeight;
+      if (!imgW || !imgH) { alert('خطأ: لم تحميل الصورة بعد'); return; }
+      
+      if (rooms.length === 0) { alert('لم تقم برسم أي قاعة!'); return; }
+      
+      let jsCode = "const MAP_ROOMS = [\n";
+      
+      rooms.forEach(room => {
+        // تحويل المضلع - نسب مئوية من الصورة الأصلية
+        const percPoints = room.points.map(p => {
+          return `${((p.x / imgW) * 100).toFixed(2)},${((p.y / imgH) * 100).toFixed(2)}`;
+        }).join(' ');
+        
+        // تحويل الأبواب - إحداثيات نسبية من الصورة المعروضة
+        let doorsCode = "[]";
+        if (room.doors.length > 0) {
+          const mappedDoors = room.doors.map(d => {
+             const pct_x = ((d.x / imgDisplayWidth) * (imgDisplayWidth / imgW) * 100).toFixed(2);
+             const pct_y = ((d.y / imgDisplayHeight) * (imgDisplayHeight / imgH) * 100).toFixed(2);
+             return `{ x: ${pct_x}, y: ${pct_y} }`;
+          });
+          doorsCode = `[\n      ${mappedDoors.join(',\n      ')}\n    ]`;
+        }
+
+        // كتابة الكود المهيكل
+        jsCode += `  {\n`;
+        jsCode += `    id: '${room.data.id}',\n`;
+        jsCode += `    label: '${room.data.label}',\n`;
+        jsCode += `    type: '${room.data.type}',\n`;
+        jsCode += `    points: '${percPoints}',\n`;
+        jsCode += `    doors: ${doorsCode}\n`;
+        jsCode += `  },\n`;
+      });
+      
+      jsCode += "];";
+      
+      const textarea = document.getElementById('export-code');
+      textarea.value = jsCode;
+      textarea.select();
+      document.execCommand('copy');
+      alert("✅ تم توليد الكود وربط الأبواب بنجاح!\n(الكود منسوخ في الحافظة)");
+    });
+  </script>
+</body>
+</html>

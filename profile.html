@@ -1,0 +1,1492 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
+  <meta name="theme-color" content="#09091a" />
+  <title>الملف الشخصي — المساعد الأكاديمي</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/styles.css" />
+  <style>
+    .profile-root{max-width:960px;margin:0 auto;padding:0 16px 80px}
+    .profile-hero-card{border-radius:var(--r-xl);overflow:hidden;margin-bottom:24px;position:relative;border:1px solid var(--border-2);box-shadow:var(--shadow-lg)}
+    .profile-cover{height:180px;background:linear-gradient(135deg,hsl(245,78%,30%) 0%,hsl(260,75%,35%) 40%,hsl(187,80%,25%) 100%);position:relative;overflow:hidden}
+    .cover-pattern{position:absolute;inset:0}
+    .cover-edit-btn{position:absolute;top:12px;left:12px;background:rgba(0,0,0,.4);border:1px solid rgba(255,255,255,.2);border-radius:8px;color:#fff;padding:6px 12px;font-size:.75rem;font-weight:700;cursor:pointer;font-family:inherit;transition:background .2s}
+    .cover-edit-btn:hover{background:rgba(0,0,0,.6)}
+    .profile-identity-area{background:var(--surface);padding:0 28px 24px;position:relative}
+    .profile-avatar-wrap{position:relative;display:inline-block;margin-top:-48px;margin-bottom:16px}
+    .profile-avatar-circle{width:96px;height:96px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent-2));display:flex;align-items:center;justify-content:center;font-size:2rem;font-weight:900;color:#fff;border:4px solid var(--surface);box-shadow:0 8px 24px rgba(99,102,241,.3)}
+    .avatar-edit-overlay{position:absolute;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;border-radius:50%;opacity:0;transition:opacity .2s;cursor:pointer;font-size:.7rem;color:#fff;font-weight:700}
+    .profile-avatar-wrap:hover .avatar-edit-overlay{opacity:1}
+    .profile-identity-row{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px}
+    .profile-name{font-size:1.5rem;font-weight:900;margin:0 0 4px}
+    .profile-meta{color:var(--muted);font-size:.88rem;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+    .profile-meta-dot{width:4px;height:4px;border-radius:50%;background:var(--border-2)}
+    .btn-edit-profile{padding:9px 20px;border-radius:10px;background:var(--accent-dim);border:1px solid rgba(99,102,241,.3);color:var(--accent);font-weight:700;font-size:.85rem;cursor:pointer;font-family:inherit;transition:background .2s;display:flex;align-items:center;gap:6px}
+    .btn-edit-profile:hover{background:rgba(99,102,241,.2)}
+    .profile-stats-bar{display:grid;grid-template-columns:repeat(4,1fr);background:var(--surface-2);border-radius:var(--r-lg);border:1px solid var(--border);overflow:hidden;margin-bottom:24px}
+    .stat-bar-item{padding:18px;text-align:center;border-left:1px solid var(--border);transition:background .2s}
+    .stat-bar-item:last-child{border-left:none}
+    .stat-bar-item:hover{background:var(--card-solid)}
+    .stat-bar-val{font-size:1.5rem;font-weight:900;margin-bottom:4px}
+    .stat-bar-lbl{font-size:.72rem;color:var(--muted);font-weight:600}
+    .profile-section{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xl);padding:28px;margin-bottom:20px;transition:box-shadow .2s}
+    .profile-section:hover{box-shadow:var(--shadow-md)}
+    .section-head-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px}
+    .section-title{font-size:1rem;font-weight:800;display:flex;align-items:center;gap:8px}
+    .btn-section-edit{background:none;border:1px solid var(--border-2);border-radius:8px;padding:6px 14px;font-size:.78rem;font-weight:700;color:var(--muted);cursor:pointer;font-family:inherit;transition:all .2s}
+    .btn-section-edit:hover{border-color:var(--accent);color:var(--accent)}
+    .achievements-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px}
+    .achievement-badge{padding:14px 12px;background:var(--surface-2);border:1.5px solid var(--border);border-radius:var(--r-md);text-align:center;transition:all .25s}
+    .achievement-badge.earned{background:linear-gradient(135deg,rgba(99,102,241,.1),rgba(6,182,212,.08));border-color:rgba(99,102,241,.3);box-shadow:0 4px 12px rgba(99,102,241,.12)}
+    .achievement-badge.locked{opacity:.4;filter:grayscale(.8)}
+    .achievement-badge:hover{transform:translateY(-2px)}
+    .badge-icon{font-size:1.8rem;margin-bottom:6px}
+    .badge-name{font-size:.72rem;font-weight:800;margin-bottom:3px}
+    .badge-desc{font-size:.65rem;color:var(--muted);line-height:1.4}
+    .info-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px}
+    .info-item{padding:14px 16px;background:var(--surface-2);border-radius:var(--r-md);border:1px solid var(--border);transition:background .2s}
+    .info-item:hover{background:var(--card-solid)}
+    .info-label{font-size:.72rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px}
+    .info-value{font-size:.95rem;font-weight:700}
+    .info-value.empty{color:var(--muted);font-style:italic;font-weight:400}
+    .gpa-ring-wrap{display:flex;align-items:center;gap:24px;flex-wrap:wrap}
+    .gpa-ring{position:relative;width:120px;height:120px;flex-shrink:0}
+    .gpa-ring svg{transform:rotate(-90deg)}
+    .gpa-ring-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+    .gpa-ring-num{font-size:1.4rem;font-weight:900;color:var(--accent)}
+    .gpa-ring-label{font-size:.65rem;color:var(--muted);font-weight:700;margin-top:1px}
+    .settings-list{display:flex;flex-direction:column;gap:10px}
+    .settings-row{display:flex;align-items:center;gap:14px;padding:16px 18px;background:var(--surface-2);border-radius:var(--r-md);border:1px solid var(--border);transition:background .2s,border-color .2s}
+    .settings-row:hover{background:var(--card-solid);border-color:var(--border-2)}
+    .settings-row-icon{width:40px;height:40px;display:flex;align-items:center;justify-content:center;background:var(--surface);border-radius:var(--r-sm);border:1px solid var(--border);flex-shrink:0}
+    .settings-row-info{flex:1;min-width:0}
+    .settings-row-title{font-size:.9rem;font-weight:700;margin-bottom:2px}
+    .settings-row-desc{font-size:.75rem;color:var(--muted)}
+    .btn-settings-action{padding:7px 16px;border-radius:8px;font-size:.8rem;font-weight:700;cursor:pointer;font-family:inherit;transition:all .2s;border:1px solid transparent}
+    .btn-settings-action.secondary{background:var(--surface);border-color:var(--border-2);color:var(--fg)}
+    .btn-settings-action.secondary:hover{border-color:var(--accent);color:var(--accent)}
+    .btn-settings-action.danger{background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.2);color:var(--danger)}
+    .btn-settings-action.danger:hover{background:rgba(239,68,68,.15)}
+    .course-chip{display:inline-flex;align-items:center;gap:8px;padding:8px 14px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-md);font-size:.82rem;font-weight:600;transition:background .2s}
+    .course-chip:hover{background:var(--card-solid)}
+    .course-diff-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+    .course-diff-dot.easy{background:var(--success)}
+    .course-diff-dot.medium{background:var(--warning)}
+    .course-diff-dot.hard{background:var(--danger)}
+    .timeline{display:flex;flex-direction:column}
+    .timeline-item{display:flex;gap:14px;padding-bottom:16px;position:relative}
+    .timeline-item::before{content:'';position:absolute;right:15px;top:28px;bottom:0;width:1px;background:var(--border)}
+    .timeline-item:last-child::before{display:none}
+    .timeline-dot{width:30px;height:30px;border-radius:50%;background:var(--surface-2);border:2px solid var(--border-2);display:flex;align-items:center;justify-content:center;font-size:.85rem;flex-shrink:0}
+    .timeline-content{flex:1;padding-top:4px}
+    .timeline-text{font-size:.88rem;font-weight:600}
+    .timeline-time{font-size:.72rem;color:var(--muted);margin-top:2px}
+    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px;animation:fadeIn .2s ease}
+    @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+    .modal-box{background:var(--surface);border:1px solid var(--border-2);border-radius:var(--r-xl);padding:28px;width:100%;max-width:440px;box-shadow:var(--shadow-lg);animation:modalIn .3s cubic-bezier(0.34,1.56,0.64,1)}
+    @keyframes modalIn{from{transform:scale(.92) translateY(10px);opacity:0}to{transform:scale(1) translateY(0);opacity:1}}
+    .modal-title{font-size:1.1rem;font-weight:900;margin-bottom:6px}
+    .modal-subtitle{color:var(--muted);font-size:.85rem;margin-bottom:24px}
+    .modal-footer{display:flex;gap:10px;justify-content:flex-end;margin-top:20px}
+    .field-input{width:100%;padding:10px 14px;background:var(--surface-2);border:1.5px solid var(--border-2);border-radius:var(--r-md);color:var(--fg);font-family:inherit;font-size:.92rem;transition:border-color .2s,box-shadow .2s;box-sizing:border-box;margin-top:4px}
+    .field-input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim)}
+    @media(max-width:640px){.profile-stats-bar{grid-template-columns:repeat(2,1fr)}.stat-bar-item{border:none;border-bottom:1px solid var(--border)}}
+  </style>
+</head>
+<body class="app" data-theme="auto" data-page="profile">
+
+  <header class="app-header" role="banner">
+    <div class="container header-inner">
+      <a class="brand" href="index.html" aria-label="الصفحة الرئيسية">
+        <span class="brand-logo" aria-hidden="true"></span>
+        <span class="brand-name">المساعد الأكاديمي</span>
+        <span class="badge">UQU</span>
+      </a>
+      <nav class="nav" role="navigation">
+        <button class="nav-toggle" aria-expanded="false" aria-controls="main-menu">☰</button>
+        <ul id="main-menu" role="list">
+          <li><a href="dashboard.html">اللوحة</a></li>
+          <li><a href="chat.html">الدردشة</a></li>
+          <li><a href="gpa.html">المعدل</a></li>
+          <li><a href="plan.html">الخطة</a></li>
+          <li><a href="pomodoro.html">بومودورو</a></li>
+          <li><a href="locations.html">القاعات</a></li>
+          <li><a href="profile.html" aria-current="page">البروفايل</a></li>
+        </ul>
+      </nav>
+      <div class="header-actions">
+        <button id="themeToggle" class="btn-ghost" type="button" aria-label="تبديل المظهر">🌓</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="app-main">
+    <div class="aurora-blob blob-1" style="opacity:.1;"></div>
+
+    <section class="section" style="padding-top:32px;">
+      <div class="profile-root">
+
+        <!-- Not logged in state -->
+        <div id="notLoggedIn" style="display:none;text-align:center;padding:80px 20px;">
+          <div style="font-size:3rem;margin-bottom:16px;">🔐</div>
+          <h2 class="h2" style="margin-bottom:10px;">سجّل الدخول أولاً</h2>
+          <p class="muted" style="margin-bottom:32px;max-width:360px;margin-inline:auto;">تحتاج إلى حساب للوصول إلى ملفك الشخصي وحفظ بياناتك الأكاديمية.</p>
+          <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
+            <a href="login.html" class="btn-primary" style="padding:12px 28px;">تسجيل الدخول</a>
+            <a href="login.html" class="btn-ghost" style="padding:12px 28px;">إنشاء حساب جديد</a>
+          </div>
+        </div>
+
+        <!-- Profile view (logged in) -->
+        <div id="profileView" style="display:none;">
+
+          <!-- Hero Card -->
+          <div class="profile-hero-card animate-block">
+            <div class="profile-cover">
+              <div class="cover-pattern"></div>
+              <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:flex-end;padding:24px;gap:12px;pointer-events:none;opacity:.15;">
+                <span style="font-size:3rem;">🎓</span>
+                <span style="font-size:2rem;margin-top:-16px;">📚</span>
+                <span style="font-size:2.5rem;margin-top:10px;">🏆</span>
+              </div>
+              <button class="cover-edit-btn" onclick="openEditModal('profile')">✏️ تعديل</button>
+            </div>
+            <div class="profile-identity-area">
+              <div class="profile-avatar-wrap">
+                <div class="profile-avatar-circle" id="profileAvatarCircle">؟</div>
+                <div class="avatar-edit-overlay" onclick="openEditModal('profile')">✏️</div>
+              </div>
+              <div class="profile-identity-row">
+                <div>
+                  <div class="profile-name" id="profileName">—</div>
+                  <div class="profile-meta">
+                    <span id="profileMajor">—</span>
+                    <div class="profile-meta-dot"></div>
+                    <span id="profileUniversity">جامعة أم القرى</span>
+                    <div class="profile-meta-dot"></div>
+                    <span id="profileLevel">—</span>
+                  </div>
+                  <div style="margin-top:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                    <span class="insight-chip info" id="profileGoalChip">🎯 هدف: —</span>
+                    <span class="insight-chip success" id="profileStreakChip">🔥 — يوم</span>
+                  </div>
+                </div>
+                <button class="btn-edit-profile" onclick="openEditModal('profile')"><span>✏️</span> تعديل الملف</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Stats Bar -->
+          <div class="profile-stats-bar animate-block delay-1">
+            <div class="stat-bar-item"><div class="stat-bar-val" id="statGpa" style="color:var(--success);">—</div><div class="stat-bar-lbl">المعدل الحالي</div></div>
+            <div class="stat-bar-item"><div class="stat-bar-val" id="statGpaTarget" style="color:var(--accent);">—</div><div class="stat-bar-lbl">المعدل المستهدف</div></div>
+            <div class="stat-bar-item"><div class="stat-bar-val" id="statCourses" style="color:var(--accent-2);">0</div><div class="stat-bar-lbl">المواد الدراسية</div></div>
+            <div class="stat-bar-item"><div class="stat-bar-val" id="statHours" style="color:var(--fg);">—</div><div class="stat-bar-lbl">الساعات المنجزة</div></div>
+          </div>
+
+          <!-- GPA Progress -->
+          <div class="profile-section animate-block delay-2">
+            <div class="section-head-row">
+              <div class="section-title">📈 تقدم المعدل التراكمي</div>
+              <a href="gpa.html" class="btn-section-edit">عرض التفاصيل ←</a>
+            </div>
+            <div class="gpa-ring-wrap">
+              <div class="gpa-ring">
+                <svg width="120" height="120" viewBox="0 0 120 120">
+                  <circle cx="60" cy="60" r="50" fill="none" stroke="var(--border-2)" stroke-width="10"/>
+                  <circle id="gpaRingFill" cx="60" cy="60" r="50" fill="none" stroke="var(--accent)" stroke-width="10" stroke-dasharray="314" stroke-dashoffset="314" stroke-linecap="round" style="transition:stroke-dashoffset 1.2s ease;filter:drop-shadow(0 0 8px rgba(99,102,241,.4));"/>
+                </svg>
+                <div class="gpa-ring-center"><div class="gpa-ring-num" id="gpaRingNum">—</div><div class="gpa-ring-label">من 5.00</div></div>
+              </div>
+              <div style="flex:1;">
+                <div style="margin-bottom:14px;">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><span style="font-size:.82rem;font-weight:700;color:var(--muted);">التقدم نحو الهدف</span><span style="font-size:.82rem;font-weight:900;color:var(--accent);" id="gpaProgressPct">—%</span></div>
+                  <div style="height:8px;background:var(--border);border-radius:99px;overflow:hidden;"><div id="gpaProgressBar" style="height:100%;background:linear-gradient(90deg,var(--accent),var(--accent-2));border-radius:99px;width:0%;transition:width 1.2s ease;"></div></div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                  <div style="padding:12px;background:var(--surface-2);border-radius:12px;text-align:center;border:1px solid var(--border);"><div style="font-size:1.1rem;font-weight:900;color:var(--success);" id="statEarnedHours">—</div><div style="font-size:.7rem;color:var(--muted);margin-top:2px;">ساعات منجزة</div></div>
+                  <div style="padding:12px;background:var(--surface-2);border-radius:12px;text-align:center;border:1px solid var(--border);"><div style="font-size:1.1rem;font-weight:900;color:var(--accent-2);" id="statRemainingHours">—</div><div style="font-size:.7rem;color:var(--muted);margin-top:2px;">ساعات متبقية</div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Achievements -->
+          <div class="profile-section animate-block delay-2">
+            <div class="section-head-row"><div class="section-title">🏆 الإنجازات والشارات</div><span style="font-size:.78rem;color:var(--muted);" id="achieveCountLabel">0 / 10</span></div>
+            <div class="achievements-grid" id="achievementsGrid"></div>
+          </div>
+
+          <!-- Academic Info -->
+          <div class="profile-section animate-block delay-3">
+            <div class="section-head-row"><div class="section-title">📋 البيانات الأكاديمية</div><button class="btn-section-edit" onclick="openEditModal('academic')">✏️ تعديل</button></div>
+            <div class="info-grid" id="academicInfoGrid"></div>
+          </div>
+
+          <!-- Courses -->
+          <div class="profile-section animate-block delay-3">
+            <div class="section-head-row"><div class="section-title">📚 مواد هذا الفصل</div><button class="btn-section-edit" onclick="startProfileWizard()">✏️ إضافة / تعديل</button></div>
+            <div id="coursesDisplay" style="display:flex;flex-wrap:wrap;gap:10px;"></div>
+          </div>
+
+          <!-- Activity Timeline -->
+          <div class="profile-section animate-block delay-3">
+            <div class="section-head-row"><div class="section-title">⏱️ النشاط الأخير</div></div>
+            <div class="timeline" id="activityTimeline"></div>
+          </div>
+
+          <!-- ═══════════ Preferences ═══════════ -->
+          <div class="profile-section animate-block">
+            <div class="section-head-row"><div class="section-title">🔔 التفضيلات</div></div>
+            <div class="settings-list">
+              <div class="settings-row">
+                <div class="settings-row-icon" style="font-size:1.3rem;">🔔</div>
+                <div class="settings-row-info">
+                  <div class="settings-row-title">الإشعارات</div>
+                  <div class="settings-row-desc">تنبيهات الاختبارات والمهام والمواعيد</div>
+                </div>
+                <button class="btn-settings-action secondary" id="notifToggleBtn" onclick="toggleNotifications()">تفعيل</button>
+              </div>
+              <div class="settings-row">
+                <div class="settings-row-icon" style="font-size:1.3rem;">🌓</div>
+                <div class="settings-row-info">
+                  <div class="settings-row-title">المظهر</div>
+                  <div class="settings-row-desc">الوضع الحالي: <span id="themeLabel">تلقائي</span></div>
+                </div>
+                <button class="btn-settings-action secondary" onclick="document.getElementById('themeToggle').click(); setTimeout(()=>{const t=document.documentElement.getAttribute('data-theme')||'auto'; document.getElementById('themeLabel').textContent={'dark':'داكن','light':'فاتح','auto':'تلقائي'}[t]||t;},100)">تبديل</button>
+              </div>
+              <div class="settings-row">
+                <div class="settings-row-icon" style="font-size:1.3rem;">🌐</div>
+                <div class="settings-row-info">
+                  <div class="settings-row-title">اللغة</div>
+                  <div class="settings-row-desc">العربية (السعودية)</div>
+                </div>
+                <span style="font-size:.78rem;color:var(--muted);font-weight:600;padding:6px 14px;background:var(--surface-2);border-radius:8px;">العربية</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- ═══════════ Security ═══════════ -->
+          <div class="profile-section animate-block">
+            <div class="section-head-row"><div class="section-title">🔒 الأمان والخصوصية</div></div>
+            <div class="settings-list">
+              <div class="settings-row">
+                <div class="settings-row-icon" style="font-size:1.3rem;">🔑</div>
+                <div class="settings-row-info">
+                  <div class="settings-row-title">كلمة المرور</div>
+                  <div class="settings-row-desc">آخر تحديث: <span id="lastUpdated">—</span></div>
+                </div>
+                <button class="btn-settings-action secondary" onclick="openEditModal('password')">تغيير</button>
+              </div>
+              <div class="settings-row">
+                <div class="settings-row-icon" style="font-size:1.3rem;">📱</div>
+                <div class="settings-row-info">
+                  <div class="settings-row-title">الجلسات النشطة</div>
+                  <div class="settings-row-desc">جهاز واحد متصل حالياً</div>
+                </div>
+                <span style="display:inline-flex;align-items:center;gap:4px;font-size:.78rem;color:var(--success);font-weight:700;padding:6px 14px;background:hsl(158,64%,45%,.1);border-radius:8px;border:1px solid hsl(158,64%,45%,.2);">● نشط</span>
+              </div>
+              <div class="settings-row">
+                <div class="settings-row-icon" style="font-size:1.3rem;">🛡️</div>
+                <div class="settings-row-info">
+                  <div class="settings-row-title">التحقق بخطوتين</div>
+                  <div class="settings-row-desc">حماية إضافية لحسابك (قريباً)</div>
+                </div>
+                <span style="font-size:.75rem;color:var(--muted);padding:5px 12px;background:var(--surface-2);border-radius:8px;font-weight:600;">قريباً</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- ═══════════ Data Management ═══════════ -->
+          <div class="profile-section animate-block">
+            <div class="section-head-row">
+              <div class="section-title">💾 إدارة البيانات</div>
+              <span style="font-size:.75rem;color:var(--muted);font-weight:600;" id="storageInfo"></span>
+            </div>
+            <div class="settings-list">
+              <div class="settings-row">
+                <div class="settings-row-icon" style="font-size:1.3rem;">📤</div>
+                <div class="settings-row-info">
+                  <div class="settings-row-title">تصدير جميع البيانات</div>
+                  <div class="settings-row-desc">حفظ نسخة احتياطية كاملة (JSON)</div>
+                </div>
+                <button class="btn-settings-action secondary" onclick="exportData()">تصدير</button>
+              </div>
+              <div class="settings-row">
+                <div class="settings-row-icon" style="font-size:1.3rem;">📥</div>
+                <div class="settings-row-info">
+                  <div class="settings-row-title">استيراد بيانات</div>
+                  <div class="settings-row-desc">استعادة نسخة احتياطية من ملف JSON</div>
+                </div>
+                <button class="btn-settings-action secondary" onclick="document.getElementById('importFileInput')&&document.getElementById('importFileInput').click()">استيراد</button>
+                <input type="file" id="importFileInput" accept=".json" style="display:none;" onchange="if(typeof handleImport==='function')handleImport(this)" />
+              </div>
+              <div class="settings-row">
+                <div class="settings-row-icon" style="font-size:1.3rem;">🧹</div>
+                <div class="settings-row-info">
+                  <div class="settings-row-title">مسح الكاش المحلي</div>
+                  <div class="settings-row-desc">إعادة تحميل جميع الملفات المؤقتة</div>
+                </div>
+                <button class="btn-settings-action secondary" onclick="if(confirm('مسح الكاش المحلي؟ لن يتأثر حسابك.')){caches&&caches.keys().then(k=>k.forEach(n=>caches.delete(n)));location.reload();}">مسح</button>
+              </div>
+            </div>
+            <!-- Existing data-io panel hook -->
+            <div id="dataIOPanelInline" style="margin-top:16px;"></div>
+          </div>
+
+          <!-- ═══════════ Account (Danger Zone) ═══════════ -->
+          <div class="profile-section animate-block" style="border-color:hsl(0,70%,58%,.15);">
+            <div class="section-head-row"><div class="section-title">🚪 الحساب</div></div>
+            <div class="settings-list">
+              <div class="settings-row">
+                <div class="settings-row-icon" style="font-size:1.3rem;">🚪</div>
+                <div class="settings-row-info">
+                  <div class="settings-row-title">تسجيل الخروج</div>
+                  <div class="settings-row-desc">الخروج من حسابك على هذا الجهاز</div>
+                </div>
+                <button class="btn-settings-action danger" onclick="window.UQUAuth&&window.UQUAuth.logout();window.location.href='login.html'">خروج</button>
+              </div>
+              <div class="settings-row" style="border-color:hsl(0,70%,58%,.15);">
+                <div class="settings-row-icon" style="font-size:1.3rem;">⚠️</div>
+                <div class="settings-row-info">
+                  <div class="settings-row-title" style="color:var(--danger);">حذف الحساب</div>
+                  <div class="settings-row-desc">سيتم حذف جميع بياناتك نهائياً ولا يمكن التراجع</div>
+                </div>
+                <button class="btn-settings-action danger" onclick="openEditModal('deleteAccount')">حذف</button>
+              </div>
+            </div>
+          </div>
+
+        </div><!-- profileView -->
+      </div>
+    </section>
+  </main>
+
+  <!-- Edit Modal -->
+  <div class="modal-overlay" id="editModal" style="display:none;" onclick="if(event.target===this)this.style.display='none'">
+    <div class="modal-box">
+      <div class="modal-title" id="modalTitle">تعديل</div>
+      <div class="modal-subtitle" id="modalSubtitle"></div>
+      <div id="modalProfileEdit">
+        <div style="margin-bottom:14px;"><label class="lbl">الاسم</label><input type="text" class="field-input" id="editName" /></div>
+        <div style="margin-bottom:14px;"><label class="lbl">التخصص</label><input type="text" class="field-input" id="editMajor" /></div>
+        <div style="margin-bottom:14px;"><label class="lbl">الجامعة</label><input type="text" class="field-input" id="editUniversity" /></div>
+      </div>
+      <div id="modalAcademicEdit" style="display:none;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div><label class="lbl">المعدل الحالي</label><input type="number" class="field-input" id="editGpaNow" step="0.01" min="0" max="5" /></div>
+          <div><label class="lbl">المعدل المستهدف</label><input type="number" class="field-input" id="editGpaTarget" step="0.01" min="0" max="5" /></div>
+          <div><label class="lbl">المستوى</label><select class="field-input" id="editLevel"><option value="">اختر</option><option value="1">الأول</option><option value="2">الثاني</option><option value="3">الثالث</option><option value="4">الرابع</option><option value="5">الخامس</option><option value="6">السادس</option><option value="7">السابع</option><option value="8">الثامن</option></select></div>
+          <div><label class="lbl">الساعات المنجزة</label><input type="number" class="field-input" id="editEarnedHours" min="0" /></div>
+          <div><label class="lbl">ساعات الخطة</label><input type="number" class="field-input" id="editPlanHours" /></div>
+          <div><label class="lbl">الأولوية</label><select class="field-input" id="editGoal"><option value="raise">رفع المعدل</option><option value="keep">المحافظة</option><option value="pass">اجتياز</option></select></div>
+        </div>
+      </div>
+      <div id="modalPasswordEdit" style="display:none;">
+        <form onsubmit="return false;" autocomplete="off">
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <div><label class="lbl">كلمة المرور الحالية</label><input type="password" class="field-input" id="pwdOld" autocomplete="current-password" /></div>
+          <div><label class="lbl">كلمة المرور الجديدة</label><input type="password" class="field-input" id="pwdNew" autocomplete="new-password" /></div>
+          <div><label class="lbl">تأكيد كلمة المرور</label><input type="password" class="field-input" id="pwdNewConfirm" autocomplete="new-password" /></div>
+        </div>
+        </form>
+      </div>
+      <div id="modalDeleteEdit" style="display:none;">
+        <div style="text-align:center;padding:16px 0;">
+          <div style="font-size:2.5rem;margin-bottom:12px;">⚠️</div>
+          <p style="color:var(--muted);font-size:.88rem;line-height:1.6;margin-bottom:16px;">سيتم حذف حسابك وجميع بياناتك الأكاديمية نهائياً.</p>
+          <input type="text" class="field-input" id="deleteConfirmInput" placeholder='اكتب "حذف" للتأكيد' />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-ghost" onclick="document.getElementById('editModal').style.display='none'">إلغاء</button>
+        <button class="btn-primary" id="modalSaveBtn" onclick="saveModalData()">💾 حفظ</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Wizard Overlay -->
+  <div id="wizardOverlay" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:900;overflow-y:auto;padding:40px 20px;">
+    <div style="max-width:760px;margin:0 auto;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:32px;">
+        <h2 class="h2">🎓 إعداد البروفايل الأكاديمي</h2>
+        <button class="btn-ghost" onclick="closeWizard()">✕ إغلاق</button>
+      </div>
+      <div class="wizard-wrap">
+        <div class="wizard-progress" role="progressbar" aria-valuemin="1" aria-valuemax="4">
+          <div class="step-dot active" id="dot1">1</div><div class="step-connector" id="con1"></div>
+          <div class="step-dot" id="dot2">2</div><div class="step-connector" id="con2"></div>
+          <div class="step-dot" id="dot3">3</div><div class="step-connector" id="con3"></div>
+          <div class="step-dot" id="dot4">4</div>
+        </div>
+        <div class="wizard-step active" id="step1">
+          <!-- Transcript Upload Area -->
+          <div class="transcript-upload-area" id="transcriptUploadArea">
+            <div class="transcript-upload-inner">
+              <div class="transcript-upload-icon">📄</div>
+              <h3 class="transcript-upload-title">رفع السجل الأكاديمي (PDF)</h3>
+              <p class="transcript-upload-desc">ارفع سجلك الأكاديمي لتعبئة البيانات تلقائياً — الاسم، المعدل، الساعات، والمواد</p>
+              <input type="file" id="transcriptFile" accept=".pdf" style="display:none;" />
+              <button class="btn-primary transcript-upload-btn" onclick="document.getElementById('transcriptFile').click()">
+                📤 اختر ملف PDF
+              </button>
+              <div class="transcript-upload-hint">أو اسحب الملف وأفلته هنا</div>
+            </div>
+            <div id="transcriptStatus" style="display:none;"></div>
+            <div id="transcriptPreview" style="display:none;"></div>
+          </div>
+
+          <!-- Timetable Upload Area -->
+          <div class="transcript-upload-area" id="timetableUploadArea" style="margin-top:20px; border-color:var(--accent); background:rgba(99, 102, 241, 0.05);">
+            <div class="transcript-upload-inner">
+              <div class="transcript-upload-icon">📅</div>
+              <h3 class="transcript-upload-title">الأتمتة: رفع جدول المحاضرات (PDF)</h3>
+              <p class="transcript-upload-desc">ارفع جدول المحاضرات لاستخراج أوقات وأيام المحاضرات وتفادي تعارض الخطة.</p>
+              <input type="file" id="timetableFile" accept=".pdf" style="display:none;" />
+              <button class="btn-primary transcript-upload-btn" onclick="document.getElementById('timetableFile').click()" style="background:var(--accent);">
+                📤 اختر جدول (PDF)
+              </button>
+            </div>
+          </div>
+
+          <style>
+            .locked-input {
+              width: 100%;
+              padding: 10px;
+              border-radius: 6px;
+              border: 1px solid var(--border-2);
+              background: rgba(0,0,0,0.3) !important;
+              color: var(--muted) !important;
+              cursor: not-allowed;
+              opacity: 0.6;
+            }
+          </style>
+          <div class="card" style="padding:32px;">
+            <h2 class="h3" style="margin-bottom:24px;">📋 المعلومات الأساسية</h2>
+            
+            <!-- Locked Auto-Filled Data -->
+            <div style="display: flex; flex-direction: column; gap: 16px; margin-bottom: 24px; background: rgba(0,0,0,0.15); padding: 20px; border-radius: 12px; border: 1px dashed var(--border);">
+              <h3 style="font-size: 0.9rem; margin-bottom: 8px; color: var(--muted);">🔒 بيانات السجل (للقراءة فقط)</h3>
+              <div class="grid grid-2" style="gap:20px;">
+                <div class="input-group">
+                  <label class="lbl" for="pName">الاسم الكامل</label>
+                  <input type="text" id="pName" class="locked-input" value="—" readonly disabled />
+                </div>
+                <div class="input-group">
+                  <label class="lbl" for="pUniversity">الجامعة</label>
+                  <input type="text" id="pUniversity" class="locked-input" value="—" readonly disabled />
+                </div>
+                <div class="input-group">
+                  <label class="lbl" for="pStudentId">الرقم الجامعي</label>
+                  <input type="text" id="pStudentId" class="locked-input" value="—" readonly disabled />
+                </div>
+                <div class="input-group">
+                  <label class="lbl" for="pDegree">الدرجة العلمية</label>
+                  <input type="text" id="pDegree" class="locked-input" value="—" readonly disabled />
+                </div>
+                <div class="input-group">
+                  <label class="lbl" for="pStudyType">نوع الدراسة</label>
+                  <input type="text" id="pStudyType" class="locked-input" value="—" readonly disabled />
+                </div>
+                <div class="input-group">
+                  <label class="lbl" for="pMajor">التخصص</label>
+                  <input type="text" id="pMajor" class="locked-input" value="—" readonly disabled />
+                </div>
+                <div class="input-group">
+                  <label class="lbl" for="pGpaNow">المعدل الحالي (من 5)</label>
+                  <input type="number" id="pGpaNow" class="locked-input" value="0.00" readonly disabled />
+                </div>
+                <div class="input-group">
+                  <label class="lbl" for="pEarnedHours">الساعات المنجزة</label>
+                  <input type="number" id="pEarnedHours" class="locked-input" value="0" readonly disabled />
+                </div>
+              </div>
+            </div>
+
+            <!-- Warning about Plan Hours -->
+            <div style="background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.5); padding: 16px; border-radius: 12px; margin-bottom: 24px; display: flex; gap: 16px; align-items: start;">
+              <div style="font-size: 1.5rem;">⚠️</div>
+              <div style="flex: 1;">
+                <h4 style="color: #d97706; margin-bottom: 8px; font-size: 0.9rem;">تأكيد خطة الدراسة</h4>
+                <p style="color: var(--muted); font-size: 0.8rem; margin-bottom: 12px;">تأكد من إدخال **ساعات الخطة** بشكل صحيح، فهذا يؤثر على جميع حسابات المعدل الأقصى.</p>
+                <div class="input-group" style="max-width: 250px; margin-bottom:0;">
+                  <label class="lbl" style="color: var(--fg);" for="pPlanHours">إجمالي ساعات الخطة</label>
+                  <input type="number" id="pPlanHours" value="160" style="background:var(--surface-2);" />
+                </div>
+              </div>
+            </div>
+
+            <!-- Highlight Manual Data -->
+            <div style="background: rgba(99, 102, 241, 0.08); border: 1px solid var(--accent); padding: 20px; border-radius: 12px; margin-bottom: 24px; box-shadow: 0 0 15px rgba(99, 102, 241, 0.1);">
+              <h3 style="font-size: 0.9rem; margin-bottom: 16px; color: var(--accent);">🎯 بيانات التخطيط اليدوية</h3>
+              <div class="grid grid-2" style="gap:20px;">
+                <div class="input-group">
+                  <label class="lbl" for="pGpaTarget">المعدل المستهدف</label>
+                  <input type="number" id="pGpaTarget" step="0.01" min="0" max="5" placeholder="4.00" oninput="window.validateTargetGpa && window.validateTargetGpa()" />
+                  <div id="maxGpaHint" style="font-size: 0.75rem; color: var(--muted); margin-top: 4px;"></div>
+                </div>
+                <div class="input-group">
+                  <label class="lbl" for="pWorkStatus">حالة العمل</label>
+                  <select id="pWorkStatus">
+                    <option value="no">لا أعمل</option>
+                    <option value="part">عمل جزئي</option>
+                    <option value="full">عمل كامل</option>
+                  </select>
+                </div>
+                <div class="input-group" style="display:none;"><label class="lbl" for="pLevel">المستوى</label><select id="pLevel"><option value="">اختر</option></select></div>
+                <div class="input-group"><label class="lbl" for="pTermPlanHours">ساعات هذا الفصل</label><input type="number" id="pTermPlanHours" placeholder="18" min="0" max="25" /></div>
+                <div class="input-group"><label class="lbl" for="pGoal">أولوية هذا الفصل</label><select id="pGoal"><option value="raise">رفع المعدل</option><option value="keep">المحافظة</option><option value="pass">اجتياز</option></select></div>
+                <div class="input-group"><label class="lbl" for="semStartDate">بداية الفصل</label><input type="date" id="semStartDate" /></div>
+                <div class="input-group"><label class="lbl" for="pWeeks">عدد أسابيع الفصل</label><input type="number" id="pWeeks" value="16" min="8" max="20" /></div>
+              </div>
+            </div>
+
+            <div style="display:flex;justify-content:flex-end;margin-top:24px;"><button class="btn-primary" id="saveStep1Btn" onclick="nextStep(2)" disabled title="يرجى رفع السجل الأكاديمي للتمكن من المتابعة">التالي ←</button></div>
+          </div>
+        </div>
+        <div class="wizard-step" id="step2">
+          <div class="card" style="padding:32px;">
+            <h2 class="h3" style="margin-bottom:24px;">🧠 أسلوب التعلم</h2>
+            <div class="grid grid-2" style="gap:20px;">
+              <div class="input-group"><label class="lbl" for="pTime">وقت المذاكرة المفضل</label><select id="pTime"><option value="morning">الصباح</option><option value="noon">الظهر</option><option value="evening" selected>المساء</option><option value="night">الليل</option></select></div>
+              <div class="input-group"><label class="lbl" for="pStyle">أسلوب المذاكرة</label><select id="pStyle"><option value="read">قراءة وتلخيص</option><option value="practice">تمارين</option><option value="visual">خرائط ذهنية</option><option value="group">جماعي</option></select></div>
+              <div class="input-group"><label class="lbl" for="pFocus">مدة التركيز: <strong id="focusVal">45 دقيقة</strong></label><input type="range" id="pFocus" min="15" max="120" step="15" value="45" oninput="document.getElementById('focusVal').textContent=this.value+' دقيقة'" /></div>
+              <div class="input-group"><label class="lbl" for="pMaxWeeklyHours">أقصى ساعات أسبوعياً</label><input type="number" id="pMaxWeeklyHours" placeholder="20" /></div>
+              <div class="input-group"><label class="lbl" for="pStress">مستوى الضغط: <strong id="stressVal">3 / 5</strong></label><input type="range" id="pStress" min="1" max="5" value="3" oninput="document.getElementById('stressVal').textContent=this.value+' / 5'" /></div>
+              <div class="input-group"><label class="lbl" for="pGroup">تفضيل الدراسة</label><select id="pGroup"><option value="solo">منفرداً</option><option value="pair">مع زميل</option><option value="group">مجموعة</option></select></div>
+              <div class="input-group">
+                <label class="lbl" for="pSpeed">سرعة الاستيعاب</label>
+                <select id="pSpeed">
+                  <option value="slow">بطيء</option>
+                  <option value="normal" selected>متوسط</option>
+                  <option value="fast">سريع</option>
+                </select>
+              </div>
+              <div class="input-group">
+                <label class="lbl" for="pEnv">بيئة المذاكرة المفضلة</label>
+                <select id="pEnv">
+                  <option value="home" selected>المنزل</option>
+                  <option value="library">المكتبة</option>
+                  <option value="cafe">كافيه</option>
+                  <option value="campus">الحرم الجامعي</option>
+                </select>
+              </div>
+              <div class="input-group">
+                <label class="lbl" for="pMemorization">أسلوب الحفظ</label>
+                <select id="pMemorization">
+                  <option value="normal" selected>عادي</option>
+                  <option value="repetition">تكرار</option>
+                  <option value="visual">بصري</option>
+                  <option value="audio">سمعي</option>
+                </select>
+              </div>
+              <div class="input-group">
+                <label class="lbl" for="pMaxDailySessions">أقصى جلسات يومياً</label>
+                <input type="number" id="pMaxDailySessions" placeholder="2" min="1" max="10" />
+              </div>
+              <div class="input-group" style="grid-column: 1 / -1;">
+                <label class="lbl" for="pBlockedTimes">أوقات مشغولة (اختياري)</label>
+                <input type="text" id="pBlockedTimes" placeholder="مثال: الأحد صباحاً، الثلاثاء مساءً" />
+              </div>
+            </div>
+            <div style="display:flex;justify-content:space-between;margin-top:24px;"><button class="btn-ghost" onclick="prevStep(1)">← رجوع</button><button class="btn-primary" onclick="nextStep(3)">التالي ←</button></div>
+          </div>
+        </div>
+        <div class="wizard-step" id="step3">
+          <div class="card" style="padding:32px;">
+            <h2 class="h3" style="margin-bottom:24px;">📚 مواد الفصل</h2>
+            <div style="padding:20px;background:var(--surface-2);border-radius:16px;border:1px solid var(--border);margin-bottom:20px;">
+              <div class="grid grid-2" style="gap:12px;">
+                <div><label class="lbl" for="newCourseName">اسم المادة *</label><input type="text" id="newCourseName" placeholder="هياكل البيانات" /></div>
+                <div><label class="lbl" for="newCourseCode">رمز المادة</label><input type="text" id="newCourseCode" placeholder="CS 201" /></div>
+                <div><label class="lbl" for="newCourseCredits">الساعات</label><input type="number" id="newCourseCredits" min="1" max="6" placeholder="3" /></div>
+                <div><label class="lbl" for="newCourseType">النوع</label><select id="newCourseType"><option value="theory">نظري</option><option value="lab">عملي</option><option value="project">مشروع</option></select></div>
+                <div><label class="lbl" for="newCourseDiff">الصعوبة</label><select id="newCourseDiff"><option value="easy">سهلة</option><option value="medium" selected>متوسطة</option><option value="hard">صعبة</option></select></div>
+                <div><label class="lbl" for="newCourseDate">تاريخ الاختبار</label><input type="date" id="newCourseDate" /></div>
+                <div><label class="lbl" for="newCourseCurrent">التقدم الحالي %</label><input type="number" id="newCourseCurrent" value="0" min="0" max="100" /></div>
+                <div><label class="lbl" for="newCourseTarget">الهدف %</label><input type="number" id="newCourseTarget" value="100" min="0" max="100" /></div>
+              </div>
+              <button onclick="addCourseToList()" class="btn-primary" style="margin-top:16px;width:100%;">+ إضافة المادة</button>
+            </div>
+            <div id="coursesListDisplay"><p class="muted" style="text-align:center;padding:20px 0;font-size:.88rem;">لم تضف مواد بعد.</p></div>
+            <div style="display:flex;justify-content:space-between;margin-top:24px;"><button class="btn-ghost" onclick="prevStep(2)">← رجوع</button><button class="btn-primary" onclick="nextStep(4)">التالي ←</button></div>
+          </div>
+        </div>
+        <div class="wizard-step" id="step4">
+          <div class="card" style="padding:32px;">
+            <h2 class="h3" style="margin-bottom:24px;">✅ مراجعة وحفظ</h2>
+            <div style="padding:20px;background:var(--surface-2);border-radius:16px;border:1px solid var(--border);margin-bottom:24px;">
+              <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
+                <div style="padding:12px;background:var(--card-solid);border-radius:12px;text-align:center;"><div style="font-size:1.4rem;font-weight:900;color:var(--accent);" id="summaryGpa">—</div><div class="muted" style="font-size:.75rem;">المعدل</div></div>
+                <div style="padding:12px;background:var(--card-solid);border-radius:12px;text-align:center;"><div style="font-size:1.4rem;font-weight:900;color:var(--accent-2);" id="summaryCourses">0</div><div class="muted" style="font-size:.75rem;">مادة</div></div>
+                <div style="padding:12px;background:var(--card-solid);border-radius:12px;text-align:center;"><div style="font-size:1.4rem;font-weight:900;color:var(--success);" id="summaryWeeks">—</div><div class="muted" style="font-size:.75rem;">أسابيع</div></div>
+              </div>
+            </div>
+            <div style="display:flex;justify-content:space-between;gap:12px;"><button class="btn-ghost" onclick="prevStep(3)">← رجوع</button><button class="btn-primary" onclick="saveProfileAndFinish()" style="padding:14px 32px;">💾 حفظ وانطلق ←</button></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Legacy data-io panel hook (hidden, data-io.js targets this) -->
+  <div id="dataIOPanel" style="display:none;"></div>
+  <div id="allBadgesPanel" style="display:none;"></div>
+
+  <link rel="manifest" href="manifest.json" />
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script src="assets/firebase-config.js"></script>
+  <div id="shortcut-hint">اضغط <kbd>⌘K</kbd> للبحث السريع</div>
+
+  <script src="assets/core.js" defer></script>
+  <script src="assets/data-bridge.js" defer></script>
+  <script src="assets/auth.js"></script>
+  <script src="assets/firebase-auth.js" defer></script>
+  <script src="assets/firebase-db.js" defer></script>
+  <script src="assets/student-model.js" defer></script>
+  <script src="assets/engine.js" defer></script>
+  <script src="assets/actions.js" defer></script>
+  <script src="assets/ai.js" defer></script>
+  <script src="assets/effects.js" defer></script>
+  <script src="assets/charts.js" defer></script>
+  <script src="assets/ux.js" defer></script>
+  <script src="assets/achievements.js" defer></script>
+  <script src="assets/data-io.js" defer></script>
+  <script src="assets/profile-guard.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="assets/transcript-parser.js" defer></script>
+  <script src="assets/ai-service.js" defer></script>
+  <script src="assets/schedule-parser.js" defer></script>
+  <script src="assets/app.js" defer></script>
+  <script src="assets/notifications.js" defer></script>
+
+  <script>
+  /* ═══════════════════════════════════════════════════════════════
+     UNIFIED PROFILE SYSTEM
+     Reads from the NESTED structure that the wizard (app.js) writes:
+       { basic:{}, learning:{}, goals:{}, courses:[] }
+     Also handles legacy flat-key format for backward compatibility.
+     ═══════════════════════════════════════════════════════════════ */
+  const PROFILE_KEY = 'uqu_profile_v2';
+  let currentModal = '';
+
+  /* ── Read raw profile from localStorage ─────────────────────── */
+  function getRawProfile() {
+    try { return JSON.parse(localStorage.getItem(PROFILE_KEY) || 'null'); }
+    catch { return null; }
+  }
+
+  /* ── Normalize: always return a unified flat object ────────── */
+  function getProfile() {
+    const raw = getRawProfile();
+    if (!raw) return null;
+
+    // Detect format: if raw.basic exists → nested (wizard format)
+    if (raw.basic || raw.goals || raw.learning) {
+      const b = raw.basic    || {};
+      const g = raw.goals    || {};
+      const l = raw.learning || {};
+      return {
+        name:          b.name,
+        university:    b.university,
+        major:         b.major,
+        level:         b.level,
+        studyType:     b.studyType,
+        workStatus:    b.workStatus,
+        semStartDate:  b.semStart,
+        weeks:         b.weeks,
+        gpaNow:        g.currentGpa,
+        gpaTarget:     g.targetGpa,
+        earnedHours:   g.earnedHours,
+        planHours:     g.planHours,
+        termPlanHours: g.termPlanHours,
+        goal:          g.priority || g.goal,
+        time:          l.preferredTime,
+        focusMinutes:  l.focusMinutes,
+        env:           l.preferredEnv,
+        style:         l.style,
+        speed:         l.speed,
+        maxWeeklyHours: l.maxWeeklyHours,
+        stressLevel:   l.stressLevel,
+        courses:       raw.courses || [],
+        savedAt:       raw.savedAt || b.savedAt,
+        _raw: raw
+      };
+    }
+
+    // Legacy flat format — read as-is
+    return { ...raw, courses: raw.courses || [], _raw: raw };
+  }
+
+  /* ── Write back: always save in the NESTED format ─────────── */
+  function saveProfile(flat) {
+    const old = getRawProfile() || {};
+    const now = new Date().toISOString();
+    const nested = {
+      basic: {
+        name:       flat.name       ?? old.basic?.name,
+        university: flat.university ?? old.basic?.university,
+        major:      flat.major      ?? old.basic?.major,
+        level:      flat.level      ?? old.basic?.level,
+        studyType:  flat.studyType  ?? old.basic?.studyType,
+        workStatus: flat.workStatus ?? old.basic?.workStatus,
+        semStart:   flat.semStartDate ?? old.basic?.semStart,
+        weeks:      flat.weeks      ?? old.basic?.weeks,
+      },
+      goals: {
+        currentGpa:    flat.gpaNow       ?? old.goals?.currentGpa,
+        targetGpa:     flat.gpaTarget    ?? old.goals?.targetGpa,
+        earnedHours:   flat.earnedHours  ?? old.goals?.earnedHours,
+        planHours:     flat.planHours    ?? old.goals?.planHours,
+        termPlanHours: flat.termPlanHours ?? old.goals?.termPlanHours,
+        priority:      flat.goal         ?? old.goals?.priority,
+      },
+      learning: {
+        preferredTime: flat.time           ?? old.learning?.preferredTime,
+        focusMinutes:  flat.focusMinutes   ?? old.learning?.focusMinutes,
+        preferredEnv:  flat.env            ?? old.learning?.preferredEnv,
+        style:         flat.style          ?? old.learning?.style,
+        speed:         flat.speed          ?? old.learning?.speed,
+        memorization:  old.learning?.memorization,
+        group:         old.learning?.group,
+        maxDailySessions: old.learning?.maxDailySessions,
+        maxWeeklyHours: flat.maxWeeklyHours ?? old.learning?.maxWeeklyHours,
+        stressLevel:   flat.stressLevel    ?? old.learning?.stressLevel,
+        blockedTimes:  old.learning?.blockedTimes,
+      },
+      courses: flat.courses ?? old.courses ?? [],
+      savedAt: now,
+    };
+    localStorage.setItem(PROFILE_KEY, JSON.stringify(nested));
+    return nested;
+  }
+
+  /* ── Get courses (unified source) ───────────────────────────── */
+  function getCourses() {
+    const p = getRawProfile();
+    if (p?.courses && p.courses.length > 0) return p.courses;
+    try { return JSON.parse(localStorage.getItem('_profileDraftCourses') || '[]'); }
+    catch { return []; }
+  }
+
+  /* ── Helpers ─────────────────────────────────────────────────── */
+  const LEVEL_MAP = {'1':'الأول','2':'الثاني','3':'الثالث','4':'الرابع','5':'الخامس','6':'السادس','7':'السابع','8':'الثامن'};
+  function levelLabel(n) { return LEVEL_MAP[String(n)] ? 'المستوى ' + LEVEL_MAP[String(n)] : '—'; }
+  function goalLabel(g) { return {'raise':'رفع المعدل','keep':'المحافظة على المعدل','pass':'اجتياز بنجاح'}[g] || '—'; }
+  const TIME_MAP = {morning:'الصباح',noon:'الظهر',evening:'المساء',night:'الليل',any:'أي وقت'};
+  function timeAgo(iso) {
+    if (!iso) return '—';
+    const d = Date.now() - new Date(iso).getTime();
+    const m = Math.floor(d / 60000);
+    if (m < 1)  return 'للتو';
+    if (m < 60) return 'منذ ' + m + ' دقيقة';
+    const h = Math.floor(m / 60);
+    if (h < 24) return 'منذ ' + h + ' ساعة';
+    return 'منذ ' + Math.floor(h / 24) + ' يوم';
+  }
+
+  /* ═══════════════════════════════════════════════════════════════
+     INIT PROFILE PAGE — reads unified data
+     ═══════════════════════════════════════════════════════════════ */
+  function initProfilePage() {
+    const s = window.UQUAuth?.getSession();
+    if (!s) { document.getElementById('notLoggedIn').style.display = 'block'; return; }
+    document.getElementById('profileView').style.display = 'block';
+
+    const a = getProfile();
+    const c = getCourses();
+    const u = window.UQUAuth?.getFullUser();
+
+    const name = a?.name || s.name || '—';
+    document.getElementById('profileName').textContent = name;
+    document.getElementById('profileMajor').textContent = a?.major || s.major || 'غير محدد';
+    document.getElementById('profileUniversity').textContent = a?.university || s?.university || 'جامعة أم القرى';
+    document.getElementById('profileLevel').textContent = levelLabel(a?.level);
+    document.getElementById('profileAvatarCircle').textContent = s.avatar || (name[0] || '؟').toUpperCase();
+    document.getElementById('profileGoalChip').textContent = '🎯 هدف: ' + goalLabel(a?.goal);
+    document.getElementById('profileStreakChip').textContent = '🔥 ' + (u?.stats?.streak || 1) + ' يوم';
+
+    document.getElementById('statGpa').textContent = a?.gpaNow ? Number(a.gpaNow).toFixed(2) : '—';
+    document.getElementById('statGpaTarget').textContent = a?.gpaTarget ? Number(a.gpaTarget).toFixed(2) : '—';
+    document.getElementById('statCourses').textContent = c.length;
+    document.getElementById('statHours').textContent = a?.earnedHours || '—';
+
+    const gpa = parseFloat(a?.gpaNow) || 0;
+    const target = parseFloat(a?.gpaTarget) || 5;
+    const pct = Math.min((gpa / 5) * 100, 100);
+    const prog = gpa && target ? Math.min((gpa / target) * 100, 100) : 0;
+    document.getElementById('gpaRingNum').textContent = gpa ? gpa.toFixed(2) : '—';
+    document.getElementById('gpaProgressPct').textContent = gpa ? Math.round(prog) + '%' : '—%';
+    document.getElementById('gpaProgressBar').style.width = prog + '%';
+
+    const earned = parseInt(a?.earnedHours) || 0;
+    const plan = parseInt(a?.planHours) || 130;
+    document.getElementById('statEarnedHours').textContent = earned || '—';
+    document.getElementById('statRemainingHours').textContent = Math.max(plan - earned, 0) || '—';
+    setTimeout(function() {
+      var circ = 2 * Math.PI * 50;
+      var off = circ - (pct / 100) * circ;
+      var r = document.getElementById('gpaRingFill');
+      if (r) r.style.strokeDashoffset = off;
+    }, 400);
+
+    var ach = window.UQUAuth?.getAchievements() || [];
+    document.getElementById('achieveCountLabel').textContent = ach.filter(function(x){return x.earned}).length + ' / ' + ach.length;
+    document.getElementById('achievementsGrid').innerHTML = ach.map(function(x) {
+      return '<div class="achievement-badge ' + (x.earned ? 'earned' : 'locked') + '" title="' + x.desc + '"><div class="badge-icon">' + x.icon + '</div><div class="badge-name">' + x.name + '</div><div class="badge-desc">' + x.desc + '</div><div style="font-size:.62rem;color:' + (x.earned ? 'var(--success)' : 'var(--muted)') + ';margin-top:4px;font-weight:700;">' + (x.earned ? '✓ محقق' : 'مقفل') + '</div></div>';
+    }).join('');
+    if (gpa >= 4.0) window.UQUAuth?.addAchievement('gpa_4plus');
+    if (gpa >= 4.5) window.UQUAuth?.addAchievement('gpa_4_5');
+    if (c.length >= 3) window.UQUAuth?.addAchievement('courses_added');
+
+    var fields = [
+      { l: 'التخصص', v: a?.major },
+      { l: 'المستوى الدراسي', v: levelLabel(a?.level) },
+      { l: 'الساعات المنجزة', v: a?.earnedHours ? a.earnedHours + ' ساعة' : null },
+      { l: 'ساعات الخطة', v: a?.planHours ? a.planHours + ' ساعة' : null },
+      { l: 'ساعات الفصل', v: a?.termPlanHours ? a.termPlanHours + ' ساعة' : null },
+      { l: 'وقت المذاكرة', v: TIME_MAP[a?.time] },
+      { l: 'بداية الفصل', v: a?.semStartDate },
+      { l: 'أسابيع الفصل', v: a?.weeks ? a.weeks + ' أسابيع' : null },
+      { l: 'أولوية الفصل', v: goalLabel(a?.goal) },
+    ];
+    document.getElementById('academicInfoGrid').innerHTML = fields.map(function(f) {
+      return '<div class="info-item"><div class="info-label">' + f.l + '</div><div class="info-value ' + (!f.v ? 'empty' : '') + '">' + (f.v || 'غير محدد') + '</div></div>';
+    }).join('');
+
+    var cd = document.getElementById('coursesDisplay');
+    if (c.length > 0) {
+      cd.innerHTML = c.map(function(x) {
+        return '<div class="course-chip"><div class="course-diff-dot ' + x.difficulty + '"></div><span>' + x.name + '</span>' + (x.creditHours ? '<span style="color:var(--muted);font-size:.72rem;">(' + x.creditHours + ')</span>' : '') + '</div>';
+      }).join('');
+    } else {
+      cd.innerHTML = '<p class="muted" style="font-size:.85rem;">لم تضف أي مواد. <a href="#" onclick="startProfileWizard();return false;" style="color:var(--accent);">أضف الآن</a></p>';
+    }
+
+    var acts = [];
+    if (u?.createdAt) acts.push({ icon: '🎉', text: 'أنشأت حسابك', time: u.createdAt });
+    if (a) acts.push({ icon: '📋', text: 'أكملت البروفايل الأكاديمي', time: a.savedAt || u?.updatedAt });
+    if (c.length > 0) acts.push({ icon: '📚', text: 'أضفت ' + c.length + ' مادة دراسية', time: a?.savedAt });
+    if (u?.stats?.lastLogin) acts.push({ icon: '🔐', text: 'آخر تسجيل دخول', time: u.stats.lastLogin });
+    acts.sort(function(x, y) { return new Date(y.time) - new Date(x.time); });
+    document.getElementById('activityTimeline').innerHTML = acts.length > 0
+      ? acts.slice(0, 5).map(function(x) { return '<div class="timeline-item"><div class="timeline-dot">' + x.icon + '</div><div class="timeline-content"><div class="timeline-text">' + x.text + '</div><div class="timeline-time">' + timeAgo(x.time) + '</div></div></div>'; }).join('')
+      : '<p class="muted" style="font-size:.85rem;">لا يوجد نشاط بعد.</p>';
+
+    document.getElementById('lastUpdated').textContent = u?.updatedAt ? timeAgo(u.updatedAt) : '—';
+    var nb = document.getElementById('notifToggleBtn');
+    if (nb) nb.textContent = u?.preferences?.notifications ? '✓ مفعّل' : 'تفعيل';
+
+    var existingBanner = document.getElementById('profileSetupBanner');
+    if (existingBanner) existingBanner.remove();
+    if (!a) {
+      var b = document.createElement('div');
+      b.id = 'profileSetupBanner';
+      b.style.cssText = 'background:var(--accent-dim);border:1px solid rgba(99,102,241,.25);border-radius:var(--r-lg);padding:20px;margin-bottom:20px;display:flex;align-items:center;gap:16px;';
+      b.innerHTML = '<span style="font-size:2rem;flex-shrink:0;">🎓</span><div style="flex:1;"><div style="font-weight:800;margin-bottom:4px;">أكمل إعداد بروفايلك الأكاديمي</div><div style="color:var(--muted);font-size:.84rem;">أضف بياناتك للحصول على خطة دراسية مخصصة.</div></div><button onclick="startProfileWizard()" class="btn-primary" style="white-space:nowrap;">ابدأ الآن →</button>';
+      document.getElementById('profileView').prepend(b);
+    }
+  }
+
+  /* ═══════════════════════════════════════════════════════════════
+     EDIT MODALS — now read/write using unified getProfile/saveProfile
+     ═══════════════════════════════════════════════════════════════ */
+  function openEditModal(type) {
+    currentModal = type;
+    var modal = document.getElementById('editModal');
+    var title = document.getElementById('modalTitle');
+    var subtitle = document.getElementById('modalSubtitle');
+    var saveBtn = document.getElementById('modalSaveBtn');
+    ['modalProfileEdit','modalAcademicEdit','modalPasswordEdit','modalDeleteEdit'].forEach(function(id) {
+      var el = document.getElementById(id); if (el) el.style.display = 'none';
+    });
+    saveBtn.style.cssText = ''; saveBtn.textContent = '💾 حفظ';
+
+    if (type === 'profile') {
+      title.textContent = '✏️ تعديل الملف الشخصي';
+      subtitle.textContent = 'عدّل اسمك وتخصصك وجامعتك';
+      document.getElementById('modalProfileEdit').style.display = 'block';
+      var s = window.UQUAuth?.getSession();
+      var a = getProfile();
+      document.getElementById('editName').value = a?.name || s?.name || '';
+      document.getElementById('editMajor').value = a?.major || s?.major || '';
+      document.getElementById('editUniversity').value = a?.university || s?.university || 'جامعة أم القرى';
+    }
+    else if (type === 'academic') {
+      title.textContent = '📋 البيانات الأكاديمية';
+      subtitle.textContent = 'عدّل معدلك وساعاتك وأهدافك';
+      document.getElementById('modalAcademicEdit').style.display = 'block';
+      var a2 = getProfile() || {};
+      document.getElementById('editGpaNow').value = a2.gpaNow || '';
+      document.getElementById('editGpaTarget').value = a2.gpaTarget || '';
+      document.getElementById('editLevel').value = a2.level || '';
+      document.getElementById('editEarnedHours').value = a2.earnedHours || '';
+      document.getElementById('editPlanHours').value = a2.planHours || 130;
+      document.getElementById('editGoal').value = a2.goal || 'raise';
+    }
+    else if (type === 'password') {
+      title.textContent = '🔒 تغيير كلمة المرور'; subtitle.textContent = '';
+      document.getElementById('modalPasswordEdit').style.display = 'block';
+      ['pwdOld','pwdNew','pwdNewConfirm'].forEach(function(id) { var el = document.getElementById(id); if (el) el.value = ''; });
+    }
+    else if (type === 'deleteAccount') {
+      title.textContent = '⚠️ حذف الحساب'; subtitle.textContent = 'لا يمكن التراجع عن هذا الإجراء';
+      document.getElementById('modalDeleteEdit').style.display = 'block';
+      document.getElementById('deleteConfirmInput').value = '';
+      saveBtn.style.background = 'var(--danger)'; saveBtn.textContent = '🗑️ حذف نهائي';
+    }
+    modal.style.display = 'flex';
+  }
+
+  async function saveModalData() {
+    if (currentModal === 'profile') {
+      var name = document.getElementById('editName')?.value.trim();
+      var major = document.getElementById('editMajor')?.value.trim();
+      var university = document.getElementById('editUniversity')?.value.trim();
+      if (!name) { window.UQUCore?.toast('الاسم مطلوب', 'error'); return; }
+      window.UQUAuth?.updateProfile({ name: name, major: major, university: university });
+      saveProfile({ name: name, major: major, university: university });
+      document.getElementById('editModal').style.display = 'none';
+      window.UQUCore?.toast('تم تحديث الملف الشخصي ✓', 'success');
+      initProfilePage();
+    }
+    else if (currentModal === 'academic') {
+      saveProfile({
+        gpaNow:      document.getElementById('editGpaNow')?.value || null,
+        gpaTarget:   document.getElementById('editGpaTarget')?.value || null,
+        level:       document.getElementById('editLevel')?.value || null,
+        earnedHours: document.getElementById('editEarnedHours')?.value || null,
+        planHours:   document.getElementById('editPlanHours')?.value || null,
+        goal:        document.getElementById('editGoal')?.value || 'raise',
+      });
+      document.getElementById('editModal').style.display = 'none';
+      window.UQUCore?.toast('تم حفظ البيانات ✓', 'success');
+      initProfilePage();
+    }
+    else if (currentModal === 'password') {
+      var old = document.getElementById('pwdOld')?.value;
+      var nw = document.getElementById('pwdNew')?.value;
+      var nw2 = document.getElementById('pwdNewConfirm')?.value;
+      if (nw !== nw2) { window.UQUCore?.toast('كلمتا المرور غير متطابقتين', 'error'); return; }
+      try {
+        await window.UQUAuth?.changePassword(old, nw);
+        document.getElementById('editModal').style.display = 'none';
+        window.UQUCore?.toast('تم تغيير كلمة المرور ✓', 'success');
+      } catch (err) { window.UQUCore?.toast(err.message, 'error'); }
+    }
+    else if (currentModal === 'deleteAccount') {
+      var conf = document.getElementById('deleteConfirmInput')?.value;
+      if (conf !== 'حذف') { window.UQUCore?.toast('اكتب "حذف" للتأكيد', 'error'); return; }
+      window.UQUAuth?.deleteAccount(); window.location.href = 'login.html';
+    }
+  }
+
+  function toggleNotifications() {
+    var u = window.UQUAuth?.getFullUser(); var p = u?.preferences || {};
+    var isOn = p.notifications;
+    window.UQUAuth?.updateProfile({ preferences: Object.assign({}, p, { notifications: !isOn }) });
+    document.getElementById('notifToggleBtn').textContent = !isOn ? '✓ مفعّل' : 'تفعيل';
+    window.UQUCore?.toast(!isOn ? 'تم تفعيل الإشعارات ✓' : 'تم إيقاف الإشعارات', 'info');
+  }
+
+  function exportData() {
+    var data = {
+      exportedAt: new Date().toISOString(),
+      auth: window.UQUAuth?.getSession(),
+      profile: getRawProfile(),
+      plan: JSON.parse(localStorage.getItem('uqu_plan_v5') || 'null'),
+      gpa: JSON.parse(localStorage.getItem('uqu_gpa_v1') || 'null'),
+    };
+    var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    var url = URL.createObjectURL(blob);
+    var link = document.createElement('a');
+    link.href = url; link.download = 'uqu_data_' + new Date().toISOString().slice(0, 10) + '.json';
+    link.click(); URL.revokeObjectURL(url);
+    window.UQUCore?.toast('تم تصدير البيانات ✓', 'success');
+  }
+
+  function startProfileWizard() {
+    document.getElementById('editModal').style.display = 'none';
+    document.getElementById('wizardOverlay').style.display = 'block';
+    var s = window.UQUAuth?.getSession();
+    var a = getProfile();
+    var raw = getRawProfile();
+    var fills = {
+      pName: a?.name || s?.name || '',
+      pUniversity: a?.university || s?.university || 'جامعة أم القرى',
+      pMajor: a?.major || s?.major || '',
+      pLevel: a?.level || '',
+      pGpaNow: a?.gpaNow || '',
+      pGpaTarget: a?.gpaTarget || '',
+      pEarnedHours: a?.earnedHours || '',
+      pPlanHours: a?.planHours || '130',
+      pTermPlanHours: a?.termPlanHours || '',
+      pGoal: a?.goal || 'raise',
+      semStartDate: a?.semStartDate || '',
+      pWeeks: a?.weeks || '16',
+      pTime: a?.time || 'evening',
+      pStyle: a?.style || 'read',
+      pFocus: a?.focusMinutes || '45',
+      pMaxWeeklyHours: a?.maxWeeklyHours || '',
+      pStress: a?.stressLevel || '3',
+      // New fields
+      pStudyType: raw?.basic?.studyType || 'full',
+      pWorkStatus: raw?.basic?.workStatus || 'no',
+      pSpeed: a?.speed || raw?.learning?.speed || 'normal',
+      pEnv: a?.env || raw?.learning?.preferredEnv || 'home',
+      pMemorization: raw?.learning?.memorization || 'normal',
+      pMaxDailySessions: raw?.learning?.maxDailySessions || '',
+      pBlockedTimes: raw?.learning?.blockedTimes || '',
+      pGroup: raw?.learning?.group || 'solo',
+    };
+    for (var id in fills) {
+      var el = document.getElementById(id);
+      if (el && fills[id]) el.value = fills[id];
+    }
+    var fv = document.getElementById('focusVal');
+    if (fv) fv.textContent = (fills.pFocus || 45) + ' دقيقة';
+    var sv = document.getElementById('stressVal');
+    if (sv) sv.textContent = (fills.pStress || 3) + ' / 5';
+  }
+
+  function closeWizard() {
+    document.getElementById('wizardOverlay').style.display = 'none';
+    initProfilePage();
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    initProfilePage();
+    // Auto-open wizard for new users (after registration redirect)
+    var profile = getRawProfile();
+    var isNewUser = !profile || !profile.basic?.name;
+    var fromRegister = new URLSearchParams(window.location.search).get('setup') === '1';
+    if (isNewUser && window.UQUAuth?.isLoggedIn()) {
+      setTimeout(function() { startProfileWizard(); }, 500);
+    }
+  });
+  window.addEventListener('uqu:auth', function(e) {
+    if (['profile_updated', 'achievement'].indexOf(e.detail?.type) !== -1) initProfilePage();
+  });
+
+  // Init data management and achievements panels
+  document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(() => {
+      if (window.UQUDataIO) UQUDataIO.renderDataPanel('dataIOPanel');
+      if (window.UQUAchievements) UQUAchievements.renderFullBadgesPage('allBadgesPanel');
+    }, 600);
+
+    // ── PDF.js Worker Setup ──
+    if (window.pdfjsLib) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
+
+    // ── Transcript File Handler ──
+    var _parsedTranscript = null;
+    var transcriptInput = document.getElementById('transcriptFile');
+    if (transcriptInput) {
+      transcriptInput.addEventListener('change', async function(e) {
+        var file = e.target.files[0];
+        if (!file) return;
+        var statusEl = document.getElementById('transcriptStatus');
+        var previewEl = document.getElementById('transcriptPreview');
+        statusEl.style.display = 'block';
+        statusEl.innerHTML = '<div class="transcript-loading"><div class="transcript-spinner"></div><span>جارٍ تحليل السجل الأكاديمي...</span></div>';
+        previewEl.style.display = 'none';
+        try {
+          var data = await window.UQUTranscript.parseTranscriptPDF(file);
+          _parsedTranscript = data;
+          statusEl.style.display = 'none';
+          previewEl.style.display = 'block';
+          previewEl.innerHTML = window.UQUTranscript.renderPreview(data);
+        } catch (err) {
+          statusEl.innerHTML = '<div class="transcript-error">❌ خطأ في تحليل الملف: ' + (err.message || 'حاول مرة أخرى') + '</div>';
+          previewEl.style.display = 'none';
+          console.error('Transcript parse error:', err);
+        }
+      });
+    }
+    
+    var _parsedSchedule = null;
+    var scheduleInput = document.getElementById('timetableFile');
+    if (scheduleInput) {
+      scheduleInput.addEventListener('change', async function(e) {
+        var file = e.target.files[0];
+        if (!file) return;
+        var btn = document.querySelector('#timetableUploadArea button');
+        var originalText = btn.innerHTML;
+        try {
+          btn.innerHTML = '⏳ العقل الذكي يحلل إحداثيات جدولك الآن...';
+          _parsedSchedule = await window.UQUSchedule.parseSchedulePDF(file);
+          console.log('[Schedule Engine] Extracted Data:', _parsedSchedule);
+          btn.innerHTML = '✅ تم تحليل الجدول بنجاح!';
+          btn.style.background = 'var(--success)';
+        } catch (err) {
+          btn.innerHTML = '❌ تعذر قراءة الجدول برمجياً';
+          btn.style.background = 'var(--danger)';
+          window.UQUCore?.toast('يرجى إدخل أوقات المواد يدوياً في الخطوة القادمة', 'warning');
+          console.error(err);
+          setTimeout(() => { btn.innerHTML = originalText; btn.style.background = 'var(--accent)'; }, 4000);
+        }
+      });
+    }
+
+    // ── Drag & Support ──
+    var uploadArea = document.getElementById('transcriptUploadArea');
+    if (uploadArea) {
+      ['dragenter', 'dragover'].forEach(function(ev) {
+        uploadArea.addEventListener(ev, function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          uploadArea.classList.add('drag-over');
+        });
+      });
+      ['dragleave', 'drop'].forEach(function(ev) {
+        uploadArea.addEventListener(ev, function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          uploadArea.classList.remove('drag-over');
+        });
+      });
+      uploadArea.addEventListener('drop', function(e) {
+        var files = e.dataTransfer.files;
+        if (files.length > 0 && files[0].name.toLowerCase().endsWith('.pdf')) {
+          var dt = new DataTransfer();
+          dt.items.add(files[0]);
+          document.getElementById('transcriptFile').files = dt.files;
+          document.getElementById('transcriptFile').dispatchEvent(new Event('change'));
+        }
+      });
+    }
+
+    // ── Apply Transcript Data to Wizard Fields (v2 — Semester-Aware) ──
+    window._applyTranscriptData = function() {
+      if (!_parsedTranscript) return;
+      var d = _parsedTranscript;
+
+      // 1) Fill basic info fields
+      if (d.name) {
+        var nameEl = document.getElementById('pName');
+        if (nameEl) nameEl.value = d.name;
+      }
+      if (d.gpa) {
+        var gpaEl = document.getElementById('pGpaNow');
+        if (gpaEl) gpaEl.value = d.gpa;
+      }
+      if (d.earnedHours) {
+        var ehEl = document.getElementById('pEarnedHours');
+        if (ehEl) ehEl.value = d.earnedHours;
+      }
+      if (d.planHours) {
+        var phEl = document.getElementById('pPlanHours');
+        if (phEl) phEl.value = d.planHours;
+      }
+      if (d.studyType) {
+        var stEl = document.getElementById('pStudyType');
+        if (stEl) {
+          stEl.value = d.studyType === 'full' ? 'انتظام' : 'انتساب';
+        }
+      }
+      if (d.studentId) {
+        var sidEl = document.getElementById('pStudentId');
+        if (sidEl) sidEl.value = d.studentId;
+      }
+      if (d.degree) {
+        var degEl = document.getElementById('pDegree');
+        if (degEl) {
+          var degText = 'أخرى';
+          if (/bachelor/i.test(d.degree)) degText = 'بكالوريوس';
+          else if (/master/i.test(d.degree)) degText = 'ماجستير';
+          degEl.value = degText;
+        }
+      }
+      
+      // GPA Scale Detection
+      var gpaScale = 5.0;
+      var uniStr = d.university || '';
+      if (uniStr.includes('أم القرى') || uniStr.includes('الملك فهد')) {
+         gpaScale = 4.0;
+      } else if (d.gpa && parseFloat(d.gpa) <= 4.0) {
+         var hasOver4 = (d.allCourses || []).some(function(c) { return c.points > 4.0; });
+         if (!hasOver4) gpaScale = 4.0;
+      }
+      window.APP_GPA_SCALE = gpaScale;
+
+      // 2) Smart university matching
+      if (d.university) {
+        var uniEl = document.getElementById('pUniversity');
+        if (uniEl) uniEl.value = d.university;
+      }
+
+      // 3) Smart major matching
+      if (d.major || d.majorEn) {
+        var majorEl = document.getElementById('pMajor');
+        if (majorEl) majorEl.value = d.major || d.majorEn;
+      }
+
+
+      // 4) Add ONLY registered/current semester courses (NOT completed ones!)
+      var currentCourses = d.registeredCourses || d.currentSemesterCourses || [];
+      if (currentCourses.length > 0 && window.addCourseToList) {
+        
+        // --- SMART AI TIMETABLE MERGE LOGIC ---
+        if (_parsedSchedule && Array.isArray(_parsedSchedule)) {
+           currentCourses.forEach(c => {
+               const code = (c.code || '').replace(/\s/g, '').toUpperCase();
+               // Find all slots for this course code from the AI array
+               const slots = _parsedSchedule.filter(s => {
+                   const aiCode = (s.courseCode || '').replace(/\s/g, '').toUpperCase();
+                   return aiCode === code;
+               });
+
+               if (slots.length > 0) {
+                   c.schedule_slots = slots;
+                   // Legacy Fallback for older UI parts if needed
+                   c.timeStr = slots[0].startTime + ' - ' + slots[0].endTime;
+                   c.daysStr = slots.map(s => s.day).join(', ');
+                   console.log('[Schedule Engine] Merged slots for:', code, slots);
+               } else {
+                   c.needsManualTime = true;
+                   console.log('[Schedule Engine] No slots found for:', code);
+               }
+           });
+        }
+
+        // Calculate term plan hours from registered courses
+        var termHrs = 0;
+        currentCourses.forEach(function(c) {
+          termHrs += (c.creditHours || 3);
+          var nameEl = document.getElementById('newCourseName');
+          var codeEl = document.getElementById('newCourseCode');
+          var creditsEl = document.getElementById('newCourseCredits');
+          var diffEl = document.getElementById('newCourseDiff');
+          if (nameEl) nameEl.value = c.nameAr || c.nameEn || c.name || '';
+          if (codeEl) codeEl.value = c.code || '';
+          if (creditsEl) creditsEl.value = c.creditHours || 3;
+          if (diffEl) diffEl.value = c.difficulty || 'medium';
+          
+          // Inject custom tags into course list renderer later or handle it in DataBridge
+          // Store these inside the wizard element if we want, currently addCourseToList takes them from inputs
+          // We don't have inputs for days/times in the old UI, so we rely on DataBridge to save the raw array:
+          
+          window.addCourseToList(c);
+        });
+        // Auto-fill term hours
+        var tphEl = document.getElementById('pTermPlanHours');
+        if (tphEl && termHrs > 0) tphEl.value = termHrs;
+      }
+
+      // 5) ═══ DataBridge: persist ALL transcript data to unified profile ═══
+      var uid = window.FirebaseAuth?.getUid?.() || window.UQUAuth?.getSession?.()?.uid || 'guest';
+      
+      if (window.DataBridge) {
+        try {
+          window.DataBridge.applyTranscriptData(d);
+          console.log('[DataBridge] Transcript data persisted to profile');
+        } catch(e) { console.warn('DataBridge transcript apply error:', e); }
+      }
+
+      // 5b) Legacy: Store completed courses history in localStorage (UID Namespaced)
+      if (d.completedCourses && d.completedCourses.length > 0) {
+        try {
+          localStorage.setItem('uqu_completed_courses_' + uid, JSON.stringify(d.completedCourses));
+        } catch(e) { console.warn('Could not save completed courses:', e); }
+      }
+
+      // 6) Store full semester history (UID Namespaced)
+      if (d.semesters && d.semesters.length > 0) {
+        try {
+          localStorage.setItem('uqu_semester_history_' + uid, JSON.stringify(d.semesters));
+        } catch(e) { console.warn('Could not save semester history:', e); }
+      }
+      
+      // Store standard profile data with UID Namepace as requested
+      try {
+         localStorage.setItem('uqu_profile_' + uid, JSON.stringify(d));
+      } catch (e) { console.warn('Could not save uqu_profile_*:', e); }
+
+      // 7) Enable the next button since data is successfully extracted and mapped
+      var nextBtn = document.getElementById('saveStep1Btn');
+      if (nextBtn) {
+         nextBtn.disabled = false;
+         nextBtn.removeAttribute('title');
+      }
+
+      // 8) Show success message
+      var previewEl = document.getElementById('transcriptPreview');
+      if (previewEl) {
+        var regCount = currentCourses.length;
+        var compCount = (d.completedCourses || []).length;
+        previewEl.innerHTML =
+          '<div class="transcript-success">' +
+          '✅ تم تطبيق البيانات بنجاح!<br>' +
+          '<span style="font-size:.82rem;font-weight:600;opacity:.85;">' +
+          '📝 ' + regCount + ' مادة مسجلة (الفصل الحالي) تمت إضافتها<br>' +
+          '📚 ' + compCount + ' مادة مكتملة محفوظة في السجل' +
+          '</span></div>';
+        setTimeout(function() { previewEl.style.display = 'none'; }, 5000);
+      }
+      
+      // TRIGGER RECALC AND AUTOMAPS
+      if (typeof window.autoMapCalendar === 'function') {
+        window.autoMapCalendar(d.university);
+      }
+      if (typeof window.recalcMaxGpa === 'function') {
+        window.recalcMaxGpa();
+      }
+
+      if (window.UQUCore?.toast) window.UQUCore.toast('تم تطبيق بيانات السجل بنجاح (' + (currentCourses.length) + ' مادة حالية + ' + ((d.completedCourses||[]).length) + ' مادة سابقة) ✅', 'success');
+    };
+    
+    // AI Helpers
+    window.academicCalendars = {
+      'جامعة أم القرى': 16,
+      'جامعة الملك سعود': 15,
+      'جامعة الملك عبدالعزيز': 16,
+      'جامعة الملك فهد للبترول والمعادن': 15,
+      'الجامعة الإسلامية بالمدينة': 16,
+      'جامعة الطائف': 16,
+      'جامعة جدة': 16,
+      'جامعة الإمام محمد بن سعود الإسلامية': 15
+    };
+
+    window.autoMapCalendar = function(uniName) {
+      if (!uniName) return;
+      var weeksField = document.getElementById('pWeeks');
+      var norm = Object.keys(window.academicCalendars).find(k => uniName.indexOf(k) !== -1);
+      if (norm && weeksField) {
+        weeksField.value = window.academicCalendars[norm];
+        weeksField.setAttribute('readonly', 'true');
+        weeksField.disabled = true;
+        weeksField.classList.add('locked-input');
+      }
+    };
+
+    window.recalcMaxGpa = function() {
+      var maxGpaHint = document.getElementById('maxGpaHint');
+      var btn = document.getElementById('saveStep1Btn');
+      var targetInput = document.getElementById('pGpaTarget');
+
+      var planHrs = parseFloat(document.getElementById('pPlanHours')?.value) || 160;
+      var earnedHrs = parseFloat(document.getElementById('pEarnedHours')?.value) || 0;
+      var currentGpa = parseFloat(document.getElementById('pGpaNow')?.value) || 0;
+      var targetGpa = parseFloat(targetInput?.value) || 0;
+      var termHrs = parseFloat(document.getElementById('pTermPlanHours')?.value) || 0;
+      
+      var scale = window.APP_GPA_SCALE || 5.0;
+
+      if (!maxGpaHint || !targetInput) return;
+      
+      // Strict intelligence limit validation
+      if (earnedHrs + termHrs > planHrs) {
+        maxGpaHint.innerHTML = "⚠️ (الساعات المنجزة + ساعات الفصل) تتجاوز إجمالي الخطة (" + planHrs + ")";
+        maxGpaHint.style.color = "var(--danger)";
+        targetInput.style.borderColor = "var(--danger)";
+        targetInput.style.boxShadow = "0 0 0 2px rgba(239, 68, 68, 0.2)";
+        if(btn) btn.disabled = true;
+        return;
+      }
+
+      var remHrs = planHrs - earnedHrs;
+      if (remHrs <= 0 && earnedHrs > 0) {
+        maxGpaHint.innerHTML = "لقد أكملت الخطة! أقصى معدل هو " + currentGpa.toFixed(2);
+        maxGpaHint.style.color = "var(--accent)";
+        if(btn) btn.disabled = false;
+        return;
+      }
+
+      var maxPossible = ((currentGpa * earnedHrs) + (scale * remHrs)) / planHrs;
+      if (maxPossible > scale) maxPossible = scale;
+
+      maxGpaHint.innerHTML = "أقصى معدل ممكن بناءً على الساعات المتبقية: <strong style='color:#10b981'>" + maxPossible.toFixed(2) + "</strong>";
+
+      if (targetGpa > maxPossible + 0.01) {
+        targetInput.style.borderColor = "var(--danger)";
+        targetInput.style.boxShadow = "0 0 0 2px rgba(239, 68, 68, 0.2)";
+        maxGpaHint.innerHTML = "⚠️ هدفك يحتاج معدل فصلي يفوق المستحيل! (أقصى معدل: " + maxPossible.toFixed(2) + " من " + scale + ")";
+        maxGpaHint.style.color = "var(--danger)";
+        if(btn) btn.disabled = true;
+      } else {
+        targetInput.style.borderColor = "var(--border)";
+        targetInput.style.boxShadow = "none";
+        maxGpaHint.style.color = "var(--muted)";
+        if(btn) btn.disabled = false;
+      }
+    };
+
+    window.validateTargetGpa = window.recalcMaxGpa;
+
+    document.addEventListener("DOMContentLoaded", function() {
+      var ti = document.getElementById('pGpaTarget');
+      if (ti) {
+        ti.addEventListener('input', window.validateTargetGpa);
+      }
+    });
+
+    // SOURCE OF TRUTH SYNC GUARD
+    setTimeout(() => {
+      var currentUid = window.FirebaseAuth?.getUid?.() || window.UQUAuth?.getSession?.()?.uid;
+      var activeUserRaw = localStorage.getItem('uqu_active_user');
+      var activeUid = null;
+      if (activeUserRaw) {
+        try { activeUid = JSON.parse(activeUserRaw).uid; } catch(e){}
+      }
+      
+      // If we are logged in, but there's mismatch in data ownership
+      if (currentUid && activeUid && currentUid !== activeUid) {
+        console.warn(`[Profile Guard] 🚨 Data leakage detected! Active User UID (${activeUid}) does not match Firebase UID (${currentUid}). Executing local purge!`);
+        var preserve = ['uqu_users_db_v2', 'uqu_theme', 'uqu_active_user'];
+        Object.keys(localStorage).forEach(k => {
+          if (k.startsWith('uqu_') && !preserve.includes(k)) {
+            localStorage.removeItem(k);
+          }
+        });
+        
+        // Sync fresh from Firestore if DB exists
+        if (window.FirebaseDB && typeof window.FirebaseDB.loadProfile === 'function') {
+          console.log('[Profile Guard] Restoring fresh data from Firestore...');
+          window.FirebaseDB.loadProfile().then(p => {
+             console.log('[Profile Guard] Data restored successfully!');
+             // Force UI refresh if needed
+             window.location.reload();
+          }).catch(err => {
+             console.error('[Profile Guard] Failed to restore from Firestore:', err);
+          });
+        }
+      }
+    }, 1500); // Wait for auth layers to initialize first
+  });
+  </script>
+
+  <!-- Storage info + theme label init -->
+  <script>
+  document.addEventListener('DOMContentLoaded', function(){
+    // Calculate localStorage size
+    try {
+      var total = 0;
+      for(var k in localStorage){ if(localStorage.hasOwnProperty(k)) total += (localStorage[k]||'').length * 2; }
+      var kb = (total / 1024).toFixed(1);
+      var el = document.getElementById('storageInfo');
+      if(el) el.textContent = 'الحجم: ' + kb + ' KB';
+    } catch(e){}
+
+    // Set theme label
+    try {
+      var t = document.documentElement.getAttribute('data-theme') || 'auto';
+      var lbl = document.getElementById('themeLabel');
+      if(lbl) lbl.textContent = {'dark':'داكن','light':'فاتح','auto':'تلقائي'}[t] || t;
+    } catch(e){}
+  });
+  </script>
+
+  <script src="assets/ai-fab.js" defer></script>
+
+  <!-- Neon Grid Background -->
+</body>
+</html>

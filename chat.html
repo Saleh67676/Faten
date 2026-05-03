@@ -1,0 +1,492 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>الدردشة — المساعد الأكاديمي</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+
+<body class="app" data-theme="auto" data-page="chat">
+
+  <header class="app-header">
+    <div class="container header-inner">
+      <a class="brand" href="index.html">
+        <span class="brand-logo" aria-hidden="true"></span>
+        <span class="brand-name">المساعد الأكاديمي</span>
+        <span class="badge">UQU</span>
+      </a>
+      <nav class="nav">
+        <button class="nav-toggle" aria-expanded="false">&#9776;</button>
+        <ul id="main-menu">
+          <li><a href="dashboard.html">اللوحة</a></li>
+          <li><a href="chat.html" aria-current="page">الدردشة</a></li>
+          <li><a href="gpa.html">المعدل</a></li>
+          <li><a href="plan.html">الخطة</a></li>
+          <li><a href="pomodoro.html">بومودورو</a></li>
+          <li><a href="locations.html">القاعات</a></li>
+        </ul>
+      </nav>
+      <div class="header-actions">
+        <button id="themeToggle" class="btn-ghost" type="button">&#127763;</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="app-main">
+    <div class="chat-layout">
+
+      <!-- Sidebar -->
+      <aside class="chat-sidebar">
+
+        <!-- Profile Mini Card -->
+        <div id="sidebarProfileCard" style="border-radius:14px;background:linear-gradient(135deg,rgba(99,102,241,.14),rgba(168,85,247,.1));
+          border:1px solid rgba(99,102,241,.2);padding:14px;margin-bottom:4px;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+            <div id="sidebarAvatar" style="width:38px;height:38px;border-radius:10px;
+              background:linear-gradient(135deg,#6366f1,#a855f7);
+              display:flex;align-items:center;justify-content:center;font-size:1.1rem;
+              color:#fff;flex-shrink:0;font-weight:800;">🎓</div>
+            <div style="flex:1;min-width:0;">
+              <div id="sidebarName" style="font-weight:700;font-size:.85rem;color:var(--fg);
+                white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">الطالب</div>
+              <div id="sidebarMajor" style="font-size:.72rem;color:var(--muted);
+                white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">جامعة أم القرى</div>
+            </div>
+            <div style="text-align:center;flex-shrink:0;">
+              <div id="sidebarGpa" style="font-size:1rem;font-weight:900;color:var(--accent);">—</div>
+              <div style="font-size:.62rem;color:var(--muted);">GPA</div>
+            </div>
+          </div>
+          <!-- GPA progress bar toward target -->
+          <div id="sidebarGpaBar" style="display:none;">
+            <div style="display:flex;justify-content:space-between;font-size:.68rem;color:var(--muted);margin-bottom:3px;">
+              <span id="sidebarGpaLabel">المعدل</span>
+              <span id="sidebarTarget"></span>
+            </div>
+            <div style="height:5px;background:rgba(255,255,255,.15);border-radius:3px;overflow:hidden;">
+              <div id="sidebarGpaBarFill" style="height:100%;border-radius:3px;
+                background:linear-gradient(90deg,#6366f1,#a855f7);transition:width .8s;width:0%;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- New Chat Button -->
+        <button id="newChatBtn" style="width:100%;padding:10px 16px;border-radius:var(--r-md);
+          background:var(--accent);color:#fff;border:none;font-family:inherit;
+          font-weight:700;font-size:.88rem;cursor:pointer;
+          display:flex;align-items:center;justify-content:center;gap:8px;transition:all var(--t-fast);">
+          <span style="font-size:1.1rem;">+</span> محادثة جديدة
+        </button>
+
+        <!-- Conversation History -->
+        <div>
+          <div style="font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;">المحادثات السابقة</div>
+          <div id="conversationsList" class="chat-history-panel">
+            <p class="muted" style="text-align:center;font-size:.82rem;padding:16px 0;">لا توجد محادثات سابقة</p>
+          </div>
+        </div>
+
+        <!-- Smart Suggestions -->
+        <div>
+          <div style="font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;">أوامر سريعة</div>
+          <div id="quickChips" style="display:flex;flex-direction:column;gap:5px;padding:0;">
+            <button class="suggestion-pill" style="text-align:right;padding:9px 13px;border-radius:11px;">📊 حلّل سجلي الأكاديمي</button>
+            <button class="suggestion-pill" style="text-align:right;padding:9px 13px;border-radius:11px;">📅 إيش عندي اليوم؟</button>
+            <button class="suggestion-pill" style="text-align:right;padding:9px 13px;border-radius:11px;">📈 كيف معدلي؟</button>
+            <button class="suggestion-pill" style="text-align:right;padding:9px 13px;border-radius:11px;">📋 ساعدني أذاكر اليوم</button>
+            <button class="suggestion-pill" style="text-align:right;padding:9px 13px;border-radius:11px;">⚠️ وش أضعف موادي؟</button>
+            <button class="suggestion-pill" style="text-align:right;padding:9px 13px;border-radius:11px;">🏛️ وين قاعة المحاضرة؟</button>
+          </div>
+        </div>
+
+        <div style="margin-top:auto;padding-top:14px;border-top:1px solid var(--border);">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span style="width:7px;height:7px;background:var(--success);border-radius:50%;box-shadow:0 0 5px var(--success);"></span>
+              <span style="font-size:.74rem;color:var(--muted);">متصل</span>
+            </div>
+            <span style="font-size:.68rem;color:var(--muted);background:rgba(99,102,241,.1);
+              border-radius:8px;padding:2px 7px;">Gemini Flash</span>
+          </div>
+          <p class="muted" style="font-size:.7rem;line-height:1.5;">بياناتك محفوظة محلياً ومحمية.</p>
+        </div>
+
+      </aside>
+
+      <!-- Chat main -->
+      <div class="chat-main">
+
+        <!-- Messages box -->
+        <div id="chatBox" role="log" aria-live="polite" aria-label="المحادثة">
+
+          <!-- Welcome state -->
+          <div class="chat-welcome" id="chatWelcome" style="padding:32px 24px;text-align:center;">
+
+            <!-- AI Avatar -->
+            <div style="width:80px;height:80px;margin:0 auto 20px;border-radius:24px;
+              background:linear-gradient(135deg,#6366f1,#a855f7);
+              display:flex;align-items:center;justify-content:center;font-size:2.4rem;
+              box-shadow:0 12px 40px rgba(99,102,241,.4);">🤖</div>
+
+            <h2 style="font-size:1.4rem;font-weight:900;margin-bottom:8px;
+              background:linear-gradient(135deg,var(--accent),#a855f7);
+              -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">
+              مرحباً! أنا فاتن 👋
+            </h2>
+            <p class="muted" style="max-width:380px;line-height:1.75;font-size:.9rem;margin:0 auto 24px;">
+              مساعدك الأكاديمي الذكي لجامعة أم القرى.<br>
+              أحلّل سجلك، أبني خططك، وأنبّهك قبل اختباراتك.
+            </p>
+
+            <!-- Feature cards -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;max-width:420px;margin:0 auto 24px;text-align:right;">
+              <button class="suggestion-pill welcome-feature-card" style="border-radius:14px;padding:14px;
+                background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.2);
+                display:flex;align-items:flex-start;gap:10px;cursor:pointer;text-align:right;">
+                <span style="font-size:1.5rem;flex-shrink:0;">📊</span>
+                <div>
+                  <div style="font-weight:700;font-size:.82rem;color:var(--fg);">تحليل السجل</div>
+                  <div style="font-size:.72rem;color:var(--muted);margin-top:2px;">تقرير أكاديمي شامل</div>
+                </div>
+              </button>
+              <button class="suggestion-pill welcome-feature-card" style="border-radius:14px;padding:14px;
+                background:rgba(34,197,94,.07);border:1px solid rgba(34,197,94,.2);
+                display:flex;align-items:flex-start;gap:10px;cursor:pointer;text-align:right;">
+                <span style="font-size:1.5rem;flex-shrink:0;">📋</span>
+                <div>
+                  <div style="font-weight:700;font-size:.82rem;color:var(--fg);">خطة مذاكرة</div>
+                  <div style="font-size:.72rem;color:var(--muted);margin-top:2px;">مخصصة لأسلوبك</div>
+                </div>
+              </button>
+              <button class="suggestion-pill welcome-feature-card" style="border-radius:14px;padding:14px;
+                background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.2);
+                display:flex;align-items:flex-start;gap:10px;cursor:pointer;text-align:right;">
+                <span style="font-size:1.5rem;flex-shrink:0;">⚠️</span>
+                <div>
+                  <div style="font-weight:700;font-size:.82rem;color:var(--fg);">تنبيهات ذكية</div>
+                  <div style="font-size:.72rem;color:var(--muted);margin-top:2px;">مواد ضعيفة واختبارات</div>
+                </div>
+              </button>
+              <button class="suggestion-pill welcome-feature-card" style="border-radius:14px;padding:14px;
+                background:rgba(168,85,247,.07);border:1px solid rgba(168,85,247,.2);
+                display:flex;align-items:flex-start;gap:10px;cursor:pointer;text-align:right;">
+                <span style="font-size:1.5rem;flex-shrink:0;">📈</span>
+                <div>
+                  <div style="font-weight:700;font-size:.82rem;color:var(--fg);">مسار المعدل</div>
+                  <div style="font-size:.72rem;color:var(--muted);margin-top:2px;">تحليل التقدم الأكاديمي</div>
+                </div>
+              </button>
+            </div>
+
+            <!-- Transcript upload hint -->
+            <div style="display:inline-flex;align-items:center;gap:8px;
+              background:rgba(99,102,241,.07);border:1px dashed rgba(99,102,241,.3);
+              border-radius:12px;padding:10px 16px;font-size:.78rem;color:var(--muted);">
+              <span style="font-size:1rem;">📎</span>
+              يمكنك رفع سجلك الأكاديمي للتحليل الفوري ←
+              <label style="cursor:pointer;color:var(--accent);font-weight:700;">
+                رفع الملف
+                <input type="file" id="transcriptUploadWelcome" accept=".txt,.csv" style="display:none">
+              </label>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Typing indicator -->
+        <div id="typing" class="msg-row" aria-label="المساعد يكتب..." role="status">
+          <div class="avatar bot-avatar" aria-hidden="true">&#129302;</div>
+          <div class="typing-dots">
+            <span></span><span></span><span></span>
+          </div>
+        </div>
+
+        <!-- Quick chips row -->
+        <div style="padding:12px 24px 0; display:flex; gap:8px; flex-wrap:wrap; border-top:1px solid var(--border); background:var(--surface);">
+          <button class="suggestion-pill" aria-label="إيش عندي اليوم">&#128197; اليوم</button>
+          <button class="suggestion-pill" aria-label="المعدل الحالي">&#128202; المعدل</button>
+          <button class="suggestion-pill" aria-label="اختبارات قريبة">&#9888;&#65039; اختبارات</button>
+          <button class="suggestion-pill" aria-label="الجلسة القادمة">&#9197; التالي</button>
+          <button class="suggestion-pill" aria-label="ملخص بروفايلي">&#128100; بروفايلي</button>
+          <button class="suggestion-pill" aria-label="ابدأ بومودورو">&#9201; بومودورو</button>
+        </div>
+
+        <!-- Input bar -->
+        <div class="chat-input-bar" style="position:relative;align-items:flex-end;">
+
+          <!-- Attach transcript button -->
+          <label title="رفع السجل الأكاديمي للتحليل" style="cursor:pointer;padding:10px 8px;
+            color:var(--muted);transition:color .2s;flex-shrink:0;display:flex;align-items:center;"
+            onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--muted)'">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+            </svg>
+            <input type="file" id="transcriptUpload" accept=".txt,.csv" style="display:none">
+          </label>
+
+          <textarea
+            id="chatInput"
+            rows="1"
+            placeholder="اسألني عن سجلك، معدلك، اختباراتك، أو اطلب خطة مذاكرة..."
+            aria-label="رسالتك"
+            autocomplete="off"
+          ></textarea>
+          <button id="sendMsg" type="button" aria-label="إرسال">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </main>
+
+  <link rel="manifest" href="manifest.json" />
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script src="assets/firebase-config.js"></script>
+
+  <div id="shortcut-hint">اضغط <kbd>&#8984;K</kbd> للبحث السريع</div>
+
+  <!-- Core libraries -->
+  <script src="assets/core.js" defer></script>
+  <script src="assets/data-bridge.js" defer></script>
+  <script src="assets/auth.js" defer></script>
+  <script src="assets/firebase-auth.js" defer></script>
+  <script src="assets/firebase-db.js" defer></script>
+  <script src="assets/notifications.js" defer></script>
+  <script src="assets/student-model.js" defer></script>
+  <script src="assets/engine.js" defer></script>
+  <script src="assets/actions.js" defer></script>
+  <!-- AI + Effects -->
+  <script src="assets/ai.js" defer></script>
+  <script src="assets/effects.js" defer></script>
+  <script src="assets/charts.js" defer></script>
+  <script src="assets/ux.js" defer></script>
+  <script src="assets/achievements.js" defer></script>
+  <script src="assets/data-io.js" defer></script>
+  <!-- Chat widgets engine -->
+  <script src="assets/chat-widgets.js" defer></script>
+  <!-- App logic -->
+  <script src="assets/app.js" defer></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(() => {});
+      });
+    }
+  </script>
+  <script src="assets/ai-fab.js" defer></script>
+
+  <script defer>
+    document.addEventListener('DOMContentLoaded', () => {
+      const box = document.getElementById('chatBox');
+      const welcome = document.getElementById('chatWelcome');
+
+      // ── Sidebar profile card loader ──
+      function loadSidebarProfile() {
+        try {
+          const profile = JSON.parse(localStorage.getItem('uqu_profile_v2') || '{}');
+          const b = profile.basic || {};
+          const g = profile.goals || {};
+          if (b.name)  document.getElementById('sidebarName').textContent  = b.name;
+          if (b.major) document.getElementById('sidebarMajor').textContent = b.major;
+          const initials = (b.name || '').charAt(0) || '🎓';
+          document.getElementById('sidebarAvatar').textContent = initials !== '🎓' ? initials : '🎓';
+
+          if (g.currentGpa) {
+            const gpa = parseFloat(g.currentGpa);
+            const el  = document.getElementById('sidebarGpa');
+            const colors = gpa >= 4 ? '#22c55e' : gpa >= 3 ? '#6366f1' : gpa >= 2 ? '#f59e0b' : '#ef4444';
+            if (el) { el.textContent = gpa.toFixed(2); el.style.color = colors; }
+
+            const bar = document.getElementById('sidebarGpaBar');
+            if (bar) {
+              bar.style.display = 'block';
+              const target = parseFloat(g.targetGpa || 5);
+              const pct    = Math.min(100, (gpa / target) * 100).toFixed(0);
+              document.getElementById('sidebarGpaLabel').textContent  = `${gpa.toFixed(2)} / 5.00`;
+              document.getElementById('sidebarTarget').textContent    = `هدف: ${target.toFixed(2)}`;
+              document.getElementById('sidebarGpaBarFill').style.width = pct + '%';
+            }
+          }
+        } catch {}
+      }
+      loadSidebarProfile();
+      window.addEventListener('uqu:profileUpdated', loadSidebarProfile);
+
+      // ── Transcript file upload handler ──
+      function handleTranscriptFile(file) {
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+          const content = reader.result;
+          const input   = document.getElementById('chatInput');
+          if (input) {
+            input.value = `رفعت سجلي الأكاديمي، يرجى تحليله بشكل مفصل:\n\n${content.slice(0, 4000)}`;
+            input.dispatchEvent(new Event('input'));
+            input.focus();
+          }
+          if (welcome && welcome.style.display !== 'none') welcome.style.display = 'none';
+        };
+        reader.readAsText(file, 'UTF-8');
+      }
+
+      document.getElementById('transcriptUpload')?.addEventListener('change', function(e) {
+        handleTranscriptFile(e.target.files[0]);
+        this.value = '';
+      });
+      document.getElementById('transcriptUploadWelcome')?.addEventListener('change', function(e) {
+        handleTranscriptFile(e.target.files[0]);
+        this.value = '';
+      });
+
+      // ── Welcome feature cards → auto-fill input ──
+      const featureTexts = [
+        'حلّل سجلي الأكاديمي وأعطني تقريراً شاملاً عن نقاط القوة والضعف',
+        'اعطني خطة مذاكرة مخصصة لهذا الأسبوع بناءً على موادي وأسلوبي',
+        'وش أضعف موادي؟ وكيف أتحسن فيها؟',
+        'عرض مسار معدلي وتحليل الاتجاه'
+      ];
+      document.querySelectorAll('.welcome-feature-card').forEach((card, i) => {
+        card.addEventListener('click', () => {
+          const input = document.getElementById('chatInput');
+          if (input && featureTexts[i]) {
+            input.value = featureTexts[i];
+            input.dispatchEvent(new Event('input'));
+            input.focus();
+          }
+        });
+      });
+
+      // Hide welcome when messages exist
+      const observer = new MutationObserver(() => {
+        const msgs = box.querySelectorAll('.msg-row');
+        if (msgs.length > 0 && welcome) {
+          welcome.style.display = 'none';
+        }
+      });
+      if (box) observer.observe(box, { childList: true });
+
+      // Render conversation history sidebar
+      function renderConversationsList() {
+        const list = document.getElementById('conversationsList');
+        if (!list || !window.ConversationManager) return;
+
+        const convos = ConversationManager.getConversationsList();
+        if (!convos.length) {
+          list.innerHTML = '<p class="muted" style="text-align:center; font-size:.82rem; padding:16px 0;">لا توجد محادثات سابقة</p>';
+          return;
+        }
+
+        list.innerHTML = convos.map(c => {
+          const date = new Date(c.updatedAt);
+          const timeStr = date.toLocaleDateString('ar-SA', { month: 'short', day: 'numeric' });
+          const isActive = c.id === ConversationManager.currentConversationId;
+          return `<div class="chat-history-item ${isActive ? 'active' : ''}" data-id="${c.id}">
+            <div style="flex:1; min-width:0;">
+              <div style="font-size:.82rem; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${c.title}</div>
+              <div class="muted" style="font-size:.7rem;">${timeStr} &middot; ${c.messageCount} رسالة</div>
+            </div>
+            <button class="delete-convo" data-id="${c.id}" style="background:none; border:none; color:var(--danger); cursor:pointer; font-size:.8rem; padding:4px; opacity:.5; transition:opacity .2s;" title="حذف">&times;</button>
+          </div>`;
+        }).join('');
+
+        // Bind click to load conversation
+        list.querySelectorAll('.chat-history-item').forEach(item => {
+          item.addEventListener('click', (e) => {
+            if (e.target.classList.contains('delete-convo')) return;
+            const id = parseInt(item.dataset.id);
+            const convo = ConversationManager.loadConversation(id);
+            if (convo) {
+              restoreChat(convo.messages);
+              renderConversationsList();
+            }
+          });
+        });
+
+        // Bind delete buttons
+        list.querySelectorAll('.delete-convo').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const id = parseInt(btn.dataset.id);
+            ConversationManager.deleteConversation(id);
+            if (parseInt(btn.closest('.chat-history-item').dataset.id) === ConversationManager.currentConversationId) {
+              box.innerHTML = '';
+              if (welcome) welcome.style.display = '';
+            }
+            renderConversationsList();
+          });
+        });
+      }
+
+      // Restore chat messages to UI
+      function restoreChat(messages) {
+        box.innerHTML = '';
+        if (welcome) welcome.style.display = 'none';
+        messages.forEach(m => {
+          if (m.role === 'user') {
+            appendMessage(m.content, 'user');
+          } else {
+            appendMessage(m.content, 'bot');
+          }
+        });
+        box.scrollTop = box.scrollHeight;
+      }
+
+      function appendMessage(text, type) {
+        if (typeof text === 'object') {
+          // Flatten if it's an object or PointerEvent
+          text = text?.content || (text instanceof Event ? '' : JSON.stringify(text));
+        }
+        text = String(text || '');
+
+        const row = document.createElement('div');
+        row.className = 'msg-row ' + (type === 'user' ? 'user-row' : '');
+
+        if (type === 'bot') {
+          row.innerHTML = `
+            <div class="avatar bot-avatar" style="width:36px; height:36px; background:linear-gradient(135deg,var(--accent),var(--accent-2)); border-radius:12px; display:grid; place-items:center; color:#fff; font-size:1rem; flex-shrink:0;">&#129302;</div>
+            <div class="msg-content bot-msg">${window.renderMarkdown ? renderMarkdown(text) : text}</div>
+          `;
+        } else {
+          row.innerHTML = `
+            <div class="msg-content user-msg">${text.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+          `;
+        }
+        box.appendChild(row);
+      }
+
+      // New chat button
+      document.getElementById('newChatBtn')?.addEventListener('click', () => {
+        if (window.ConversationManager) ConversationManager.newConversation();
+        box.innerHTML = '';
+        if (welcome) welcome.style.display = '';
+        renderConversationsList();
+      });
+
+      // Load last session on start
+      if (window.ConversationManager) {
+        ConversationManager.loadLast();
+        if (ConversationManager.history.length) {
+          restoreChat(ConversationManager.history);
+        }
+        renderConversationsList();
+      }
+
+      // Update conversations list after each message
+      const origObserver = new MutationObserver(() => {
+        setTimeout(renderConversationsList, 500);
+      });
+      origObserver.observe(box, { childList: true });
+    });
+  </script>
+
+  <!-- Neon Grid Background -->
+</body>
+</html>

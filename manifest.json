@@ -1,0 +1,32 @@
+{
+  "name": "المساعد الأكاديمي — UQU",
+  "short_name": "UQU مساعد",
+  "description": "مساعدك الأكاديمي الذكي: تخطيط الدراسة، حساب المعدل، والمساعد الذكي",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "./dashboard.html",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone"],
+  "orientation": "portrait-primary",
+  "background_color": "#09091a",
+  "theme_color": "#6366f1",
+  "scope": "./",
+  "categories": ["education", "productivity"],
+  "icons": [
+    { "src": "./icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "./icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
+  "screenshots": [
+    { "src": "./screenshot-wide.png",   "sizes": "1280x720", "type": "image/png", "form_factor": "wide",   "label": "لوحة المعلومات" },
+    { "src": "./screenshot-mobile.png", "sizes": "390x844",  "type": "image/png", "form_factor": "narrow", "label": "الشاشة الرئيسية" }
+  ],
+  "shortcuts": [
+    { "name": "الدردشة الذكية",   "short_name": "دردشة", "url": "./chat.html",    "description": "اسأل المساعد الذكي" },
+    { "name": "حاسبة المعدل",    "short_name": "معدل",  "url": "./gpa.html",     "description": "احسب معدلك التراكمي" },
+    { "name": "الخطة الدراسية",  "short_name": "خطة",   "url": "./plan.html",    "description": "راجع جدول المذاكرة" },
+    { "name": "بومودورو الذكي",  "short_name": "بومودورو", "url": "./pomodoro.html", "description": "مؤقت مذاكرة ذكي" },
+    { "name": "لوحة المعلومات",  "short_name": "لوحة",  "url": "./dashboard.html","description": "نظرة شاملة على أدائك" }
+  ],
+  "prefer_related_applications": false,
+  "edge_side_panel": { "preferred_width": 400 }
+}

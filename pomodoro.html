@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>بومودورو — المساعد الأكاديمي</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+
+<body class="app" data-theme="auto" data-page="pomodoro">
+
+  <header class="app-header">
+    <div class="container header-inner">
+      <a class="brand" href="index.html">
+        <span class="brand-logo" aria-hidden="true"></span>
+        <span class="brand-name">المساعد الأكاديمي</span>
+        <span class="badge">UQU</span>
+      </a>
+      <nav class="nav">
+        <button class="nav-toggle" aria-expanded="false">&#9776;</button>
+        <ul id="main-menu">
+          <li><a href="dashboard.html">اللوحة</a></li>
+          <li><a href="chat.html">الدردشة</a></li>
+          <li><a href="gpa.html">المعدل</a></li>
+          <li><a href="plan.html">الخطة</a></li>
+          <li><a href="pomodoro.html" aria-current="page">بومودورو</a></li>
+          <li><a href="locations.html">القاعات</a></li>
+        </ul>
+      </nav>
+      <div class="header-actions">
+        <button id="themeToggle" class="btn-ghost" type="button">&#127763;</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="app-main">
+    <div class="container" style="max-width:1100px; padding-block:32px;">
+
+      <!-- Page Header -->
+      <div class="animate-block" style="text-align:center; margin-bottom:40px;">
+        <span class="pill" style="margin-bottom:12px;">&#9201; مؤقت ذكي</span>
+        <h1 class="h2">بومودورو الذكي</h1>
+        <p class="muted" style="max-width:480px; margin-inline:auto; margin-top:8px;">ركّز على مذاكرتك مع مؤقت بومودورو متكامل مع خطتك الدراسية</p>
+      </div>
+
+      <div style="display:grid; grid-template-columns:1fr 340px; gap:32px; align-items:start;">
+
+        <!-- Timer Section -->
+        <div>
+          <!-- Timer Card -->
+          <div class="card animate-block" id="timerCard" style="text-align:center; padding:40px 32px;">
+
+            <!-- Course Selector -->
+            <div style="margin-bottom:24px;">
+              <label class="muted" style="font-size:.82rem; display:block; margin-bottom:8px;">المادة الحالية</label>
+              <select id="pomoCourse" style="background:var(--surface-2); color:var(--fg); border:1px solid var(--border-2); border-radius:var(--r-md); padding:10px 16px; font-family:inherit; font-size:.95rem; width:100%; max-width:320px; cursor:pointer;">
+                <option value="">-- مذاكرة عامة --</option>
+              </select>
+            </div>
+
+            <!-- Timer Ring -->
+            <div id="timerRing" style="position:relative; width:260px; height:260px; margin:0 auto 28px;">
+              <svg width="260" height="260" viewBox="0 0 260 260" style="transform:rotate(-90deg);">
+                <circle cx="130" cy="130" r="115" fill="none" stroke="var(--border)" stroke-width="10" opacity=".3"/>
+                <circle id="timerProgress" cx="130" cy="130" r="115" fill="none" stroke="var(--accent)" stroke-width="10" stroke-linecap="round" stroke-dasharray="722.57" stroke-dashoffset="0" style="transition:stroke-dashoffset .5s ease, stroke .3s;"/>
+              </svg>
+              <div style="position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+                <div id="timerDisplay" style="font-size:3.5rem; font-weight:900; letter-spacing:2px; line-height:1; font-variant-numeric:tabular-nums;">25:00</div>
+                <div id="timerLabel" class="muted" style="font-size:.88rem; margin-top:6px;">جلسة تركيز</div>
+              </div>
+            </div>
+
+            <!-- Controls -->
+            <div style="display:flex; gap:12px; justify-content:center; flex-wrap:wrap;">
+              <button id="pomoStart" class="btn-mega" style="min-width:140px; font-size:1rem; padding:14px 28px;">
+                <span>&#9654;</span> <span>ابدأ</span>
+              </button>
+              <button id="pomoPause" class="btn-ghost" style="min-width:100px; display:none;">
+                <span>&#10074;&#10074;</span> إيقاف مؤقت
+              </button>
+              <button id="pomoReset" class="btn-ghost" style="min-width:100px;">
+                <span>&#8635;</span> إعادة
+              </button>
+              <button id="pomoSkip" class="btn-ghost" style="min-width:100px; display:none;">
+                <span>&#9197;</span> تخطي
+              </button>
+            </div>
+
+            <!-- Mode Tabs -->
+            <div style="display:flex; gap:8px; justify-content:center; margin-top:24px;">
+              <button class="pomo-mode-btn active" data-mode="focus">تركيز</button>
+              <button class="pomo-mode-btn" data-mode="short">استراحة قصيرة</button>
+              <button class="pomo-mode-btn" data-mode="long">استراحة طويلة</button>
+            </div>
+          </div>
+
+          <!-- Settings Card -->
+          <div class="card animate-block delay-1" style="margin-top:20px; padding:24px;">
+            <h3 class="h4" style="margin-bottom:16px;">&#9881; إعدادات المؤقت</h3>
+            <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:16px;">
+              <div>
+                <label class="muted" style="font-size:.78rem; display:block; margin-bottom:6px;">مدة التركيز (دقيقة)</label>
+                <input id="setFocus" type="number" min="5" max="90" value="25" style="background:var(--surface-2); color:var(--fg); border:1px solid var(--border-2); border-radius:var(--r-sm); padding:8px 12px; font-family:inherit; width:100%; text-align:center;">
+              </div>
+              <div>
+                <label class="muted" style="font-size:.78rem; display:block; margin-bottom:6px;">استراحة قصيرة</label>
+                <input id="setShort" type="number" min="1" max="30" value="5" style="background:var(--surface-2); color:var(--fg); border:1px solid var(--border-2); border-radius:var(--r-sm); padding:8px 12px; font-family:inherit; width:100%; text-align:center;">
+              </div>
+              <div>
+                <label class="muted" style="font-size:.78rem; display:block; margin-bottom:6px;">استراحة طويلة</label>
+                <input id="setLong" type="number" min="5" max="60" value="15" style="background:var(--surface-2); color:var(--fg); border:1px solid var(--border-2); border-radius:var(--r-sm); padding:8px 12px; font-family:inherit; width:100%; text-align:center;">
+              </div>
+            </div>
+            <div style="margin-top:16px; display:flex; gap:16px; align-items:center; flex-wrap:wrap;">
+              <label style="display:flex; align-items:center; gap:8px; font-size:.88rem; cursor:pointer;">
+                <input id="setSound" type="checkbox" checked style="accent-color:var(--accent); width:18px; height:18px;">
+                صوت التنبيه
+              </label>
+              <label style="display:flex; align-items:center; gap:8px; font-size:.88rem; cursor:pointer;">
+                <input id="setAutoBreak" type="checkbox" checked style="accent-color:var(--accent); width:18px; height:18px;">
+                استراحة تلقائية
+              </label>
+              <label style="display:flex; align-items:center; gap:8px; font-size:.88rem; cursor:pointer;">
+                <input id="setNotify" type="checkbox" checked style="accent-color:var(--accent); width:18px; height:18px;">
+                إشعارات المتصفح
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sidebar Stats -->
+        <div>
+          <!-- Today Stats -->
+          <div class="card animate-block delay-1" style="padding:24px;">
+            <h3 class="h4" style="margin-bottom:16px;">&#128200; إحصائيات اليوم</h3>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+              <div style="background:var(--surface-2); border-radius:var(--r-md); padding:16px; text-align:center;">
+                <div id="statSessions" style="font-size:2rem; font-weight:900; color:var(--accent);">0</div>
+                <div class="muted" style="font-size:.78rem;">جلسة مكتملة</div>
+              </div>
+              <div style="background:var(--surface-2); border-radius:var(--r-md); padding:16px; text-align:center;">
+                <div id="statMinutes" style="font-size:2rem; font-weight:900; color:var(--accent-2);">0</div>
+                <div class="muted" style="font-size:.78rem;">دقيقة تركيز</div>
+              </div>
+              <div style="background:var(--surface-2); border-radius:var(--r-md); padding:16px; text-align:center;">
+                <div id="statStreak" style="font-size:2rem; font-weight:900; color:var(--warning);">0</div>
+                <div class="muted" style="font-size:.78rem;">سلسلة متتالية</div>
+              </div>
+              <div style="background:var(--surface-2); border-radius:var(--r-md); padding:16px; text-align:center;">
+                <div id="statBest" style="font-size:2rem; font-weight:900; color:var(--success);">0</div>
+                <div class="muted" style="font-size:.78rem;">أفضل يوم</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Weekly Chart -->
+          <div class="card animate-block delay-2" style="padding:24px; margin-top:16px;">
+            <h3 class="h4" style="margin-bottom:16px;">&#128202; هذا الأسبوع</h3>
+            <div id="weeklyChart" style="display:flex; gap:6px; align-items:flex-end; height:120px; padding-top:8px;">
+              <!-- Rendered by JS -->
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-top:8px;">
+              <span class="muted" style="font-size:.7rem;">السبت</span>
+              <span class="muted" style="font-size:.7rem;">الجمعة</span>
+            </div>
+          </div>
+
+          <!-- Session History -->
+          <div class="card animate-block delay-3" style="padding:24px; margin-top:16px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+              <h3 class="h4">&#128221; آخر الجلسات</h3>
+              <button id="clearHistory" class="muted" style="font-size:.75rem; background:none; border:none; cursor:pointer; text-decoration:underline;">مسح</button>
+            </div>
+            <div id="sessionHistory" style="display:flex; flex-direction:column; gap:8px; max-height:280px; overflow-y:auto;">
+              <p class="muted" style="text-align:center; font-size:.85rem; padding:20px 0;">لا توجد جلسات بعد. ابدأ أول جلسة!</p>
+            </div>
+          </div>
+
+          <!-- Course Breakdown -->
+          <div class="card animate-block delay-3" style="padding:24px; margin-top:16px;">
+            <h3 class="h4" style="margin-bottom:16px;">&#128218; التوزيع حسب المادة</h3>
+            <div id="courseBreakdown" style="display:flex; flex-direction:column; gap:10px;">
+              <p class="muted" style="text-align:center; font-size:.85rem;">ابدأ جلسات لرؤية التوزيع</p>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </main>
+
+  <footer class="app-footer">
+    <div class="container foot-inner">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span class="brand-logo" style="width:28px;height:28px;border-radius:8px;" aria-hidden="true"></span>
+        <span style="font-weight:700;">المساعد الأكاديمي</span>
+      </div>
+      <span>&copy; <span id="year"></span> — جامعة أم القرى</span>
+    </div>
+  </footer>
+
+  <link rel="manifest" href="manifest.json" />
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script src="assets/firebase-config.js"></script>
+
+  <div id="shortcut-hint">اضغط <kbd>&#8984;K</kbd> للبحث السريع</div>
+
+  <script src="assets/core.js" defer></script>
+  <script src="assets/data-bridge.js" defer></script>
+  <script src="assets/auth.js" defer></script>
+  <script src="assets/firebase-auth.js" defer></script>
+  <script src="assets/firebase-db.js" defer></script>
+  <script src="assets/notifications.js" defer></script>
+  <script src="assets/student-model.js" defer></script>
+  <script src="assets/engine.js" defer></script>
+  <script src="assets/actions.js" defer></script>
+  <script src="assets/ai.js" defer></script>
+  <script src="assets/effects.js" defer></script>
+  <script src="assets/charts.js" defer></script>
+  <script src="assets/ux.js" defer></script>
+  <script src="assets/app.js" defer></script>
+  <script src="assets/pomodoro.js" defer></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(() => {});
+      });
+    }
+  </script>
+  <script src="assets/ai-fab.js" defer></script>
+
+  <!-- Neon Grid Background -->
+</body>
+</html>

@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MapStudio Pro — أداة رسم مسارات التوجيه</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap');
+
+:root {
+  --bg:#060a12; --panel:#0d1421; --card:#111827;
+  --border:#1f2d45; --border-hi:#2d4a70;
+  --blue:#3b82f6; --cyan:#06b6d4; --green:#10b981;
+  --amber:#f59e0b; --red:#ef4444; --purple:#8b5cf6;
+  --text:#f1f5f9; --text2:#94a3b8; --muted:#475569;
+  --r:7px;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);height:100vh;overflow:hidden;display:flex;flex-direction:column;}
+
+/* ═══ TOPBAR ═══ */
+#topbar{height:52px;background:var(--panel);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 14px;gap:7px;z-index:200;flex-shrink:0;position:relative;}
+#topbar::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--blue),var(--cyan),transparent);opacity:.35;}
+.logo{font-size:.95rem;font-weight:900;background:linear-gradient(135deg,var(--blue),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-left:10px;}
+.sep{width:1px;height:26px;background:var(--border);margin:0 3px;}
+.tb{display:flex;align-items:center;gap:5px;padding:6px 12px;border-radius:var(--r);border:1px solid var(--border);background:transparent;color:var(--text2);font-family:inherit;font-size:.78rem;cursor:pointer;transition:all .15s;white-space:nowrap;}
+.tb:hover{background:rgba(255,255,255,.05);color:var(--text);border-color:var(--border-hi);}
+.tb.on{background:rgba(245,158,11,.12);border-color:var(--amber);color:var(--amber);font-weight:700;animation:pulse 1.4s ease-in-out infinite;}
+.tb.pri{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:700;box-shadow:0 0 14px rgba(59,130,246,.3);}
+.tb.pri:hover{background:#2563eb;}
+.tb.dan{border-color:var(--red);color:var(--red);}
+.tb.dan:hover{background:rgba(239,68,68,.1);}
+@keyframes pulse{0%,100%{box-shadow:0 0 6px rgba(245,158,11,.3)}50%{box-shadow:0 0 16px rgba(245,158,11,.6)}}
+.sp{flex:1;}
+.chk{display:flex;align-items:center;gap:4px;font-size:.72rem;color:var(--text2);cursor:pointer;}
+.chk input{accent-color:var(--blue);cursor:pointer;}
+
+/* ═══ MAIN LAYOUT ═══ */
+#main{display:flex;flex:1;overflow:hidden;}
+
+/* ═══ SIDEBAR ═══ */
+#sidebar{width:250px;background:var(--panel);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0;}
+.sb-hd{padding:10px 12px;border-bottom:1px solid var(--border);font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;}
+.layer-row{display:flex;align-items:center;gap:6px;padding:8px 12px;font-size:.8rem;color:var(--text2);cursor:pointer;transition:background .1s;}
+.layer-row:hover{background:rgba(255,255,255,.03);}
+.layer-row input{accent-color:var(--blue);cursor:pointer;}
+
+/* ═══ WORKSPACE ═══ */
+#workspace{flex:1;overflow:hidden;position:relative;background:#030609;}
+#vp{position:absolute;inset:0;overflow:hidden;user-select:none;}
+#mw{position:absolute;top:0;left:0;transform-origin:0 0;}
+#mi{display:block;max-width:none;-webkit-user-drag:none;pointer-events:none;vertical-align:top;}
+#sv{position:absolute;top:0;left:0;pointer-events:all;overflow:visible;display:block;}
+
+/* SVG styles */
+.room-poly{pointer-events:none;opacity:.3;}
+.door-dot{pointer-events:none;fill:#ef4444;stroke:#fff;stroke-width:1;}
+.graph-edge{stroke:#3b82f6;stroke-width:2.5;cursor:pointer;transition:stroke .1s;}
+.graph-edge:hover{stroke:#60a5fa;stroke-width:4;}
+.graph-node{fill:#facc15;stroke:#111827;stroke-width:1.5;cursor:pointer;transition:fill .1s;}
+.graph-node:hover{fill:#fff;r:6;}
+.drawing-edge{stroke:#facc15;stroke-width:2.5;stroke-dasharray:6,4;pointer-events:none;}
+.snap-point{fill:none;stroke:#10b981;stroke-width:2;r:8;pointer-events:none;animation:pulseSnap .8s infinite;}
+.auto-snap-line{stroke:#f59e0b;stroke-width:1.5;stroke-dasharray:4,3;pointer-events:none;opacity:0.7;}
+@keyframes pulseSnap{0%,100%{transform:scale(1);opacity:.8}50%{transform:scale(1.3);opacity:1}}
+
+/* ═══ ZOOM CONTROLS ═══ */
+#zoom-box{position:absolute;bottom:40px;right:14px;display:flex;flex-direction:column;gap:3px;z-index:100;}
+.zb{width:32px;height:32px;border-radius:var(--r);background:var(--card);border:1px solid var(--border-hi);color:var(--text);font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .12s;}
+.zb:hover{background:rgba(255,255,255,.08);border-color:var(--blue);}
+.zl{background:var(--card);border:1px solid var(--border);border-radius:var(--r);color:var(--muted);font-size:.65rem;font-family:monospace;text-align:center;padding:2px;}
+
+/* ═══ COORD DISPLAY ═══ */
+#coord{position:absolute;bottom:8px;right:8px;background:rgba(17,24,39,.85);border:1px solid var(--border);border-radius:var(--r);padding:3px 8px;font-size:.68rem;color:var(--muted);z-index:50;direction:ltr;font-family:monospace;}
+
+/* ═══ STATUS BAR ═══ */
+#sbar{height:26px;background:var(--panel);border-top:1px solid var(--border);display:flex;align-items:center;padding:0 12px;gap:12px;font-size:.68rem;color:var(--muted);flex-shrink:0;}
+.sd{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+
+/* ═══ MODAL ═══ */
+#modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);z-index:500;display:none;align-items:center;justify-content:center;}
+#modal-bg.on{display:flex;}
+.modal{background:var(--card);border:1px solid var(--border-hi);border-radius:12px;padding:22px;width:540px;max-height:80vh;display:flex;flex-direction:column;gap:12px;}
+.modal pre{flex:1;background:#010409;border:1px solid var(--border);border-radius:8px;padding:12px;color:#4ade80;font-family:monospace;font-size:11px;overflow:auto;white-space:pre;direction:ltr;text-align:left;max-height:340px;}
+.modal-btn{flex:1;padding:8px;border-radius:var(--r);border:none;font-weight:700;cursor:pointer;}
+.modal-btn.g{background:var(--green);color:#fff;}
+.modal-btn.n{background:var(--panel);border:1px solid var(--border);color:var(--text2);}
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <span style="font-size:1.15rem">🗺️</span>
+  <span class="logo">MapStudio Pro (Graph Engine)</span>
+  <div class="sep"></div>
+  <button class="tb on" id="bDraw">🛤 رسم مسار (D)</button>
+  <button class="tb" id="bEdit">✏️ تعديل (E)</button>
+  <button class="tb" id="bDel">🗑 حذف (X)</button>
+  <div class="sep"></div>
+  <label class="chk"><input type="checkbox" id="cSnap" checked>مغناطيس</label>
+  <label class="chk"><input type="checkbox" id="cDoors" checked>أبواب</label>
+  <label class="chk"><input type="checkbox" id="cSnaps" checked>خطوط الباب</label>
+  <label class="chk"><input type="checkbox" id="cRooms" checked>قاعات</label>
+  <div class="sep"></div>
+  <button class="tb pri" id="bExport">📤 تصدير NAV_GRAPH</button>
+  <button class="tb dan" id="bClear">🧹 مسح الكل</button>
+  <div class="sp"></div>
+</div>
+
+<div id="main">
+  <div id="sidebar">
+    <div class="sb-hd">👁 الطبقات والإعدادات</div>
+    <div id="layer-controls"></div>
+    <div class="sb-hd" style="margin-top:20px">ℹ️ تعليمات الرسم</div>
+    <div style="padding:10px 14px;font-size:0.75rem;color:var(--text2);line-height:1.8">
+      <b>رسم شجري:</b> انقر على أي مسار موجود ليبدأ مسار جديد متصل به.<br>
+      <b>إنهاء الخط:</b> اضغط <kbd>Enter</kbd> أو <kbd>Esc</kbd>.<br>
+      <b>التنقل بالخريطة:</b> اضغط زر الماوس الأوسط واسحب، أو اضغط مسطرة (Space).
+    </div>
+  </div>
+
+  <div id="workspace">
+    <div id="vp">
+      <div id="mw">
+        <img id="mi" src="assets/base-map.jpg" alt="">
+        <svg id="sv">
+          <g id="l-rooms"></g>
+          <g id="l-doors"></g>
+          <g id="l-auto-snaps"></g>
+          <g id="l-edges"></g>
+          <g id="l-nodes"></g>
+          <g id="l-ui"></g>
+        </svg>
+      </div>
+    </div>
+    <div id="zoom-box">
+      <button class="zb" id="zIn">+</button>
+      <div class="zl" id="zLbl">100%</div>
+      <button class="zb" id="zOut">−</button>
+    </div>
+    <div id="coord">X: — Y: —</div>
+  </div>
+</div>
+
+<div id="sbar">
+  <div style="display:flex;align-items:center;gap:5px"><span class="sd b"></span><span id="sNodesCount">0 عقدة</span></div>
+  <div style="display:flex;align-items:center;gap:5px"><span class="sd g"></span><span id="sEdgesCount">0 مسار</span></div>
+  <div style="margin-right:auto;color:var(--amber)" id="sMode">وضع: رسم</div>
+</div>
+
+<div id="modal-bg">
+  <div class="modal">
+    <h3 id="mTitle">تصدير مسارات التوجيه</h3>
+    <pre id="mCode"></pre>
+    <div style="display:flex;gap:8px">
+      <button class="modal-btn g" id="mOk">📋 نسخ الكود</button>
+      <button class="modal-btn n" id="mClose">✕ إغلاق</button>
+    </div>
+  </div>
+</div>
+
+<script src="assets/map-data.js"></script>
+
+<script>
+// ==========================================
+// 1. ENGINE STATE & VARIABLES
+// ==========================================
+let nodes = {}; // { "n_1": {x, y, id}, ... }
+let edges = []; // [ {from: "n_1", to: "n_2", id: "e_1"}, ... ]
+let nodeCounter = 1;
+let edgeCounter = 1;
+
+let mode = 'DRAW'; // DRAW, EDIT, DEL
+let drawingFromNode = null;
+let hoverNode = null;
+let hoverEdge = null;
+let dragNode = null;
+
+// Pan & Zoom
+let scale = 1, panX = 0, panY = 0;
+let isPanning = false, startX = 0, startY = 0, startPanX = 0, startPanY = 0;
+let isSpaceDown = false;
+let imgW = 0, imgH = 0;
+
+// Elements
+const vp = document.getElementById('vp');
+const mw = document.getElementById('mw');
+const mi = document.getElementById('mi');
+const sv = document.getElementById('sv');
+
+const lRooms = document.getElementById('l-rooms');
+const lDoors = document.getElementById('l-doors');
+const lSnaps = document.getElementById('l-auto-snaps');
+const lEdges = document.getElementById('l-edges');
+const lNodes = document.getElementById('l-nodes');
+const lUi = document.getElementById('l-ui');
+
+// UI indicators
+let rubberBand = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+rubberBand.setAttribute('class', 'drawing-edge');
+rubberBand.style.display = 'none';
+lUi.appendChild(rubberBand);
+
+let snapIndicator = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+snapIndicator.setAttribute('class', 'snap-point');
+snapIndicator.style.display = 'none';
+lUi.appendChild(snapIndicator);
+
+// ==========================================
+// 2. INITIALIZATION
+// ==========================================
+mi.onload = () => {
+    imgW = mi.naturalWidth || 2000;
+    imgH = mi.naturalHeight || 1500;
+    mw.style.width = imgW + 'px';
+    mw.style.height = imgH + 'px';
+    sv.style.width = imgW + 'px';
+    sv.style.height = imgH + 'px';
+    sv.setAttribute('viewBox', `0 0 ${imgW} ${imgH}`);
+    
+    // Center map
+    scale = Math.min(vp.clientWidth/imgW, vp.clientHeight/imgH) * 0.9;
+    panX = (vp.clientWidth - imgW*scale)/2;
+    panY = (vp.clientHeight - imgH*scale)/2;
+    updateTransform();
+    
+    loadExistingData();
+};
+if(mi.complete) mi.onload();
+
+function loadExistingData() {
+    // رسم القاعات من MAP_DATA
+    if(window.MAP_DATA) {
+        window.MAP_DATA.forEach(room => {
+            if(room.shapeType === 'polygon' && room.points && room.type !== 'corridor') {
+                let p = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+                p.setAttribute('points', room.points.split(' ').map(pt => {
+                    let coords = pt.split(',');
+                    return `${(coords[0]*imgW/100)},${(coords[1]*imgH/100)}`;
+                }).join(' '));
+                p.setAttribute('fill', room.color);
+                p.setAttribute('class', 'room-poly');
+                lRooms.appendChild(p);
+            }
+            if(room.doors) {
+                room.doors.forEach(door => {
+                    let d = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                    d.setAttribute('cx', (door.x*imgW)/100);
+                    d.setAttribute('cy', (door.y*imgH)/100);
+                    d.setAttribute('r', 5);
+                    d.setAttribute('class', 'door-dot');
+                    d.dataset.room = room.id;
+                    lDoors.appendChild(d);
+                });
+            }
+        });
+    }
+
+    // استيراد المسارات من NAV_GRAPH إن وجدت
+    if(window.NAV_GRAPH && window.NAV_GRAPH.nodes) {
+        Object.keys(window.NAV_GRAPH.nodes).forEach(k => {
+            let n = window.NAV_GRAPH.nodes[k];
+            nodes[k] = { id: k, x: (n.x*imgW)/100, y: (n.y*imgH)/100 };
+            let m = k.match(/\d+/);
+            if(m && parseInt(m[0]) >= nodeCounter) nodeCounter = parseInt(m[0])+1;
+        });
+        (window.NAV_GRAPH.edges || []).forEach(e => {
+            // تجاهل روابط الأبواب المانيوال (نبي بس شبكة الممرات)
+            if(e.from.includes('__door') || e.to.includes('__door')) return;
+            let edgeId = 'e_' + edgeCounter++;
+            edges.push({ id: edgeId, from: e.from, to: e.to });
+        });
+    }
+    
+    renderGraph();
+    updateDoorSnaps();
+}
+
+// ==========================================
+// 3. GRAPH RENDERER
+// ==========================================
+function renderGraph() {
+    lEdges.innerHTML = '';
+    lNodes.innerHTML = '';
+    
+    edges.forEach(e => {
+        let n1 = nodes[e.from];
+        let n2 = nodes[e.to];
+        if(!n1 || !n2) return;
+        let line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', n1.x); line.setAttribute('y1', n1.y);
+        line.setAttribute('x2', n2.x); line.setAttribute('y2', n2.y);
+        line.setAttribute('class', 'graph-edge');
+        line.dataset.id = e.id;
+        lEdges.appendChild(line);
+    });
+
+    Object.values(nodes).forEach(n => {
+        let c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        c.setAttribute('cx', n.x); c.setAttribute('cy', n.y);
+        c.setAttribute('r', 4);
+        c.setAttribute('class', 'graph-node');
+        c.dataset.id = n.id;
+        lNodes.appendChild(c);
+    });
+    
+    document.getElementById('sNodesCount').textContent = Object.keys(nodes).length + ' عقدة';
+    document.getElementById('sEdgesCount').textContent = edges.length + ' مسار';
+    updateDoorSnaps();
+}
+
+// ==========================================
+// 4. CORE DRAWING & BRANCHING LOGIC
+// ==========================================
+function c2s(cx, cy) {
+    const r = vp.getBoundingClientRect();
+    return {
+        x: (cx - r.left - panX) / scale,
+        y: (cy - r.top - panY) / scale
+    };
+}
+
+// رياضيات: إسقاط نقطة على خط
+function projectPoint(px, py, ax, ay, bx, by) {
+    let dx = bx - ax, dy = by - ay;
+    let l2 = dx*dx + dy*dy;
+    if (l2 === 0) return { x: ax, y: ay, t: 0 };
+    let t = Math.max(0, Math.min(1, ((px - ax)*dx + (py - ay)*dy) / l2));
+    return { x: ax + t*dx, y: ay + t*dy, t: t };
+}
+
+function findSnap(x, y) {
+    if(!document.getElementById('cSnap').checked) return null;
+    const SNAP_DIST = 15 / scale;
+    
+    // 1. المغناطيس على عقدة موجودة (Node)
+    let bestDist = SNAP_DIST, bestNode = null;
+    Object.values(nodes).forEach(n => {
+        let d = Math.hypot(n.x - x, n.y - y);
+        if(d < bestDist) { bestDist = d; bestNode = n; }
+    });
+    if(bestNode) return { type: 'node', node: bestNode, x: bestNode.x, y: bestNode.y };
+    
+    // 2. المغناطيس على منتصف مسار (Edge) لإنشاء تقاطع جديد (T-Junction)
+    let bestEdge = null, bestProj = null;
+    bestDist = SNAP_DIST;
+    edges.forEach(e => {
+        let n1 = nodes[e.from], n2 = nodes[e.to];
+        if(!n1 || !n2) return;
+        let proj = projectPoint(x, y, n1.x, n1.y, n2.x, n2.y);
+        let d = Math.hypot(x - proj.x, y - proj.y);
+        if(d < bestDist) { bestDist = d; bestEdge = e; bestProj = proj; }
+    });
+    
+    if(bestEdge) return { type: 'edge', edge: bestEdge, x: bestProj.x, y: bestProj.y };
+    return null;
+}
+
+// التفاعل مع الماوس
+sv.addEventListener('mousemove', e => {
+    let pt = c2s(e.clientX, e.clientY);
+    document.getElementById('coord').textContent = `X: ${(pt.x/imgW*100).toFixed(1)}%  Y: ${(pt.y/imgH*100).toFixed(1)}%`;
+    
+    if(mode === 'DRAW') {
+        let snap = findSnap(pt.x, pt.y);
+        let tx = snap ? snap.x : pt.x;
+        let ty = snap ? snap.y : pt.y;
+        
+        if(snap) {
+            snapIndicator.setAttribute('cx', tx);
+            snapIndicator.setAttribute('cy', ty);
+            snapIndicator.style.display = 'block';
+        } else {
+            snapIndicator.style.display = 'none';
+        }
+        
+        if(drawingFromNode) {
+            rubberBand.setAttribute('x1', drawingFromNode.x);
+            rubberBand.setAttribute('y1', drawingFromNode.y);
+            rubberBand.setAttribute('x2', tx);
+            rubberBand.setAttribute('y2', ty);
+            rubberBand.style.display = 'block';
+        }
+    } else {
+        rubberBand.style.display = 'none';
+        snapIndicator.style.display = 'none';
+    }
+});
+
+sv.addEventListener('mousedown', e => {
+    if(e.button !== 0 || isSpaceDown) return;
+    let pt = c2s(e.clientX, e.clientY);
+    
+    if(mode === 'DRAW') {
+        let snap = findSnap(pt.x, pt.y);
+        let targetNode = null;
+        
+        if(snap && snap.type === 'node') {
+            targetNode = snap.node; // ربط شجري مع نقطة موجودة
+        } 
+        else if (snap && snap.type === 'edge') {
+            // قطع المسار لإنشاء تقاطع جديد! (Edge Splitting)
+            let nId = 'n_' + nodeCounter++;
+            targetNode = { id: nId, x: snap.x, y: snap.y };
+            nodes[nId] = targetNode;
+            
+            let eOld = snap.edge;
+            // حذف القديم
+            edges = edges.filter(ed => ed.id !== eOld.id);
+            // إضافة مسارين جديدة
+            edges.push({ id: 'e_' + edgeCounter++, from: eOld.from, to: nId });
+            edges.push({ id: 'e_' + edgeCounter++, from: nId, to: eOld.to });
+        } 
+        else {
+            // نقطة جديدة عادية في الفراغ
+            let nId = 'n_' + nodeCounter++;
+            targetNode = { id: nId, x: pt.x, y: pt.y };
+            nodes[nId] = targetNode;
+        }
+        
+        // إذا كنا نرسم خط، نوصله بالنقطة الهدف
+        if(drawingFromNode && drawingFromNode.id !== targetNode.id) {
+            edges.push({ id: 'e_' + edgeCounter++, from: drawingFromNode.id, to: targetNode.id });
+        }
+        
+        drawingFromNode = targetNode;
+        renderGraph();
+    }
+    
+    else if(mode === 'DEL') {
+        // إذا ضغط على نقطة نحذفها ونحذف كل الخطوط الموصولة فيها
+        if(e.target.classList.contains('graph-node')) {
+            let nid = e.target.dataset.id;
+            delete nodes[nid];
+            edges = edges.filter(ed => ed.from !== nid && ed.to !== nid);
+            renderGraph();
+        }
+        // إذا ضغط على مسار نحذفه
+        else if(e.target.classList.contains('graph-edge')) {
+            let eid = e.target.dataset.id;
+            edges = edges.filter(ed => ed.id !== eid);
+            renderGraph();
+        }
+    }
+});
+
+// إنهاء الخط الحالي (عشان ترسم من مكان جديد)
+window.addEventListener('keydown', e => {
+    if(e.key === 'Escape' || e.key === 'Enter') {
+        drawingFromNode = null;
+        rubberBand.style.display = 'none';
+    }
+    if(e.code === 'Space') { isSpaceDown = true; vp.style.cursor = 'grabbing'; }
+});
+window.addEventListener('keyup', e => {
+    if(e.code === 'Space') { isSpaceDown = false; vp.style.cursor = mode==='DRAW'?'crosshair':'default'; }
+});
+
+// ==========================================
+// 5. DOOR AUTO-SNAP (Visual Feedback)
+// ==========================================
+function updateDoorSnaps() {
+    lSnaps.innerHTML = '';
+    if(!document.getElementById('cSnaps').checked || edges.length === 0) return;
+    
+    document.querySelectorAll('.door-dot').forEach(door => {
+        let dx = parseFloat(door.getAttribute('cx'));
+        let dy = parseFloat(door.getAttribute('cy'));
+        
+        let bestDist = Infinity, bestPt = null;
+        edges.forEach(e => {
+            let n1 = nodes[e.from], n2 = nodes[e.to];
+            if(!n1 || !n2) return;
+            let proj = projectPoint(dx, dy, n1.x, n1.y, n2.x, n2.y);
+            let dist = Math.hypot(dx - proj.x, dy - proj.y);
+            if(dist < bestDist) { bestDist = dist; bestPt = proj; }
+        });
+        
+        if(bestPt && bestDist < 100) {
+            let sl = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            sl.setAttribute('x1', dx); sl.setAttribute('y1', dy);
+            sl.setAttribute('x2', bestPt.x); sl.setAttribute('y2', bestPt.y);
+            sl.setAttribute('class', 'auto-snap-line');
+            lSnaps.appendChild(sl);
+            
+            let sc = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            sc.setAttribute('cx', bestPt.x); sc.setAttribute('cy', bestPt.y);
+            sc.setAttribute('r', 3); sc.setAttribute('fill', '#f59e0b');
+            lSnaps.appendChild(sc);
+        }
+    });
+}
+
+// ==========================================
+// 6. PAN & ZOOM & UI
+// ==========================================
+function updateTransform() {
+    mw.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
+    document.getElementById('zLbl').textContent = Math.round(scale*100) + '%';
+}
+vp.addEventListener('wheel', e => {
+    e.preventDefault();
+    let r = vp.getBoundingClientRect();
+    let mx = e.clientX - r.left, my = e.clientY - r.top;
+    let ns = Math.min(Math.max(scale * (e.deltaY < 0 ? 1.15 : 0.85), 0.1), 10);
+    panX = mx - (mx - panX) * (ns / scale);
+    panY = my - (my - panY) * (ns / scale);
+    scale = ns; updateTransform();
+});
+vp.addEventListener('mousedown', e => {
+    if(e.button === 1 || isSpaceDown) {
+        isPanning = true; startX = e.clientX; startY = e.clientY;
+        startPanX = panX; startPanY = panY;
+    }
+});
+window.addEventListener('mousemove', e => {
+    if(isPanning) {
+        panX = startPanX + (e.clientX - startX);
+        panY = startPanY + (e.clientY - startY);
+        updateTransform();
+    }
+});
+window.addEventListener('mouseup', () => isPanning = false);
+
+// الأزرار
+document.getElementById('bDraw').onclick = function() { setMode('DRAW', this); };
+document.getElementById('bEdit').onclick = function() { setMode('EDIT', this); alert('ميزة التعديل قيد التطوير، استخدم الحذف وأعد الرسم للسرعة.'); };
+document.getElementById('bDel').onclick = function() { setMode('DEL', this); };
+document.getElementById('bClear').onclick = () => { if(confirm('مسح كل المسارات؟')) { nodes={}; edges=[]; renderGraph(); drawingFromNode=null; }};
+
+function setMode(m, btn) {
+    mode = m; drawingFromNode = null; rubberBand.style.display = 'none';
+    document.querySelectorAll('.tb').forEach(b => b.classList.remove('on'));
+    btn.classList.add('on');
+    document.getElementById('sMode').textContent = 'وضع: ' + (m==='DRAW'?'رسم':m==='DEL'?'حذف':'تعديل');
+    vp.style.cursor = m === 'DRAW' ? 'crosshair' : 'default';
+}
+
+// الطبقات
+document.getElementById('cRooms').onchange = e => lRooms.style.display = e.target.checked ? 'block' : 'none';
+document.getElementById('cDoors').onchange = e => lDoors.style.display = e.target.checked ? 'block' : 'none';
+document.getElementById('cSnaps').onchange = e => { updateDoorSnaps(); lSnaps.style.display = e.target.checked ? 'block' : 'none'; };
+
+// ==========================================
+// 7. EXPORT TO NAV_GRAPH
+// ==========================================
+document.getElementById('bExport').onclick = () => {
+    let expNodes = {};
+    let expEdges = [];
+    
+    // تحويل الإحداثيات للنسب المئوية
+    Object.keys(nodes).forEach(k => {
+        let n = nodes[k];
+        expNodes[k] = {
+            x: parseFloat((n.x / imgW * 100).toFixed(2)),
+            y: parseFloat((n.y / imgH * 100).toFixed(2)),
+            type: "waypoint",
+            corridorId: "CL_MAIN"
+        };
+    });
+    
+    edges.forEach(e => {
+        let n1 = expNodes[e.from], n2 = expNodes[e.to];
+        if(n1 && n2) {
+            let w = Math.hypot(n1.x - n2.x, n1.y - n2.y);
+            expEdges.push({ from: e.from, to: e.to, weight: parseFloat(w.toFixed(2)) });
+        }
+    });
+
+    let code = JSON.stringify({ nodes: expNodes, edges: expEdges }, null, 2);
+    document.getElementById('mCode').textContent = code;
+    document.getElementById('modal-bg').classList.add('on');
+};
+
+document.getElementById('mClose').onclick = () => document.getElementById('modal-bg').classList.remove('on');
+document.getElementById('mOk').onclick = () => { navigator.clipboard.writeText(document.getElementById('mCode').textContent); alert('تم النسخ بنجاح!'); };
+
+</script>
+</body>
+</html>

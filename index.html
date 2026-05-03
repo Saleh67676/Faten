@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
+  <meta name="description" content="المساعد الأكاديمي الذكي لجامعة أم القرى — منصة متكاملة للمحادثة، حساب المعدل، وخطط المذاكرة" />
+  <meta name="theme-color" content="#09091a" />
+  <title>المساعد الأكاديمي الذكي — UQU</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+
+<body class="app" data-theme="auto" data-page="home">
+
+  <header class="app-header" role="banner">
+    <div class="container header-inner">
+      <a class="brand" href="index.html" aria-label="الصفحة الرئيسية">
+        <span class="brand-logo" aria-hidden="true"></span>
+        <span class="brand-name">المساعد الأكاديمي</span>
+        <span class="badge">UQU</span>
+      </a>
+      <nav class="nav" role="navigation" aria-label="القائمة الرئيسية">
+        <button class="nav-toggle" aria-expanded="false" aria-controls="main-menu" aria-label="فتح القائمة">☰</button>
+        <ul id="main-menu" role="list">
+          <li><a href="dashboard.html">اللوحة</a></li>
+          <li><a href="chat.html">الدردشة</a></li>
+          <li><a href="gpa.html">المعدل</a></li>
+          <li><a href="plan.html">الخطة</a></li>
+          <li><a href="pomodoro.html">بومودورو</a></li>
+          <li><a href="locations.html">القاعات</a></li>
+          <li><a href="profile.html">البروفايل</a></li>
+        </ul>
+      </nav>
+      <div class="header-actions">
+        <button id="themeToggle" class="btn-ghost" type="button" aria-label="تبديل المظهر">🌓</button>
+      </div>
+    </div>
+  </header>
+
+  <main id="content" class="app-main" style="overflow-x:hidden;">
+
+    <!-- Hero Section -->
+    <section class="section full-bleed" style="min-height:90vh; display:flex; align-items:center;">
+      <div class="aurora-blob blob-1" aria-hidden="true"></div>
+      <div class="aurora-blob blob-2" aria-hidden="true"></div>
+
+      <div class="container grid grid-2" style="align-items:center; gap:clamp(32px,6vw,80px);">
+
+        <div class="hero-copy">
+          <div class="animate-block">
+            <span class="pill">
+              <span>✨</span>
+              <span>الذكاء الاصطناعي الأكاديمي — جامعة أم القرى</span>
+            </span>
+          </div>
+
+          <h1 class="h1 animate-block delay-1" style="margin-top:20px;">
+            رفيقك الذكي<br>
+            <span style="background:linear-gradient(135deg,var(--accent),var(--accent-2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">
+              في الرحلة الجامعية.
+            </span>
+          </h1>
+
+          <p class="lead animate-block delay-2" style="max-width:520px; margin-block:24px 40px;">
+            منصة متكاملة تجمع لك المحادثة الذكية، حاسبة المعدل،
+            وجداول المذاكرة الذكية في مكان واحد بتصميم عصري.
+          </p>
+
+          <div class="animate-block delay-3" style="display:flex; flex-direction:column; gap:16px;">
+            <a href="chat.html" class="btn-mega" style="align-self:flex-start;">
+              <span>💬</span>
+              <span>ابدأ المحادثة الآن</span>
+            </a>
+            <div style="display:flex; gap:12px; flex-wrap:wrap;">
+              <a href="gpa.html" class="btn-ghost">🧮 حاسبة المعدل</a>
+              <a href="plan.html" class="btn-ghost">📅 خطة المذاكرة</a>
+              <a href="locations.html" class="btn-ghost">📍 القاعات</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="hero-visual animate-block delay-2">
+          <div class="chat-mockup" style="max-width:440px; margin:auto;">
+            <div class="glass-card" style="border-radius:28px;">
+              <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;border-bottom:1px solid rgba(255,255,255,.12);padding-bottom:16px;">
+                <div style="width:44px;height:44px;background:linear-gradient(135deg,var(--accent),var(--accent-2));border-radius:14px;display:grid;place-items:center;color:#fff;font-size:1.3rem;">🤖</div>
+                <div>
+                  <div style="font-weight:800;font-size:1rem;color:#fff;">المساعد الأكاديمي</div>
+                  <div style="font-size:.75rem;color:rgba(255,255,255,.7);display:flex;align-items:center;gap:5px;">
+                    <span style="width:7px;height:7px;background:#10b981;border-radius:50%;display:inline-block;box-shadow:0 0 8px #10b981;"></span>
+                    متصل الآن
+                  </div>
+                </div>
+              </div>
+
+              <div class="msg-bubble user" style="margin-bottom:16px;">
+                أحتاج مساعدة في حساب المعدل لو سمحت..
+              </div>
+              <div class="msg-bubble bot" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.12);color:#fff;">
+                أهلاً بك! ولا يهمك 🚀 توجه لصفحة <strong>حاسبة المعدل</strong> أو أعطني درجاتك هنا وسأقوم بالحساب فوراً.
+              </div>
+
+              <div style="margin-top:20px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.10);height:48px;border-radius:99px;display:flex;align-items:center;padding:0 20px;color:rgba(255,255,255,.5);font-size:.9rem;">
+                اكتب رسالتك هنا...
+                <div style="margin-right:auto;width:32px;height:32px;background:var(--accent);border-radius:50%;display:grid;place-items:center;color:#fff;">↑</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="section">
+      <div class="container">
+        <div class="section-head animate-block" style="text-align:center;">
+          <span class="pill" style="margin-bottom:16px;">⚡ الأدوات</span>
+          <h2 class="h2">أدوات احترافية لمسيرتك الأكاديمية</h2>
+          <p class="lead" style="margin-top:12px; max-width:520px; margin-inline:auto;">كل ما تحتاجه للتميز الدراسي في مكان واحد</p>
+        </div>
+
+        <div class="grid cards-3">
+
+          <article class="card animate-block delay-1" tabindex="0">
+            <div style="width:52px;height:52px;background:rgba(99,102,241,.15);border-radius:16px;display:grid;place-items:center;font-size:1.6rem;margin-bottom:20px;border:1px solid rgba(99,102,241,.2);">📊</div>
+            <h3 class="h3" style="margin-bottom:10px;">لوحة المعلومات</h3>
+            <p class="muted" style="margin-bottom:24px;line-height:1.7;">نظرة شاملة على تقدمك الأكاديمي، معدلاتك، والمهام القادمة.</p>
+            <a href="dashboard.html" style="color:var(--accent);font-weight:700;display:inline-flex;align-items:center;gap:6px;transition:gap .2s;">عرض اللوحة <span>←</span></a>
+          </article>
+
+          <article class="card animate-block delay-2" tabindex="0" style="border-color:rgba(99,102,241,.25);">
+            <div style="width:52px;height:52px;background:rgba(99,102,241,.15);border-radius:16px;display:grid;place-items:center;font-size:1.6rem;margin-bottom:20px;border:1px solid rgba(99,102,241,.2);">🧮</div>
+            <h3 class="h3" style="margin-bottom:10px;">حاسبة المعدل</h3>
+            <p class="muted" style="margin-bottom:24px;line-height:1.7;">حساب دقيق وآني للمعدل الفصلي والتراكمي بنظام من 5.</p>
+            <a href="gpa.html" style="color:var(--accent);font-weight:700;display:inline-flex;align-items:center;gap:6px;">احسب الآن <span>←</span></a>
+          </article>
+
+          <article class="card animate-block delay-3" tabindex="0">
+            <div style="width:52px;height:52px;background:rgba(6,182,212,.12);border-radius:16px;display:grid;place-items:center;font-size:1.6rem;margin-bottom:20px;border:1px solid rgba(6,182,212,.2);">📅</div>
+            <h3 class="h3" style="margin-bottom:10px;">خطة الدراسة الذكية</h3>
+            <p class="muted" style="margin-bottom:24px;line-height:1.7;">خطط مذاكرة ذكية تأخذ بعين الاعتبار وقتك الحر وصعوبة المواد.</p>
+            <a href="plan.html" style="color:var(--accent-2);font-weight:700;display:inline-flex;align-items:center;gap:6px;">ابنِ خطتك <span>←</span></a>
+          </article>
+
+          <article class="card animate-block delay-1" tabindex="0">
+            <div style="width:52px;height:52px;background:rgba(6,182,212,.12);border-radius:16px;display:grid;place-items:center;font-size:1.6rem;margin-bottom:20px;border:1px solid rgba(6,182,212,.2);">💬</div>
+            <h3 class="h3" style="margin-bottom:10px;">المساعد الذكي</h3>
+            <p class="muted" style="margin-bottom:24px;line-height:1.7;">تحدث مع المساعد لتنظيم دراستك، حساب المعدل، ومتابعة الاختبارات.</p>
+            <a href="chat.html" style="color:var(--accent-2);font-weight:700;display:inline-flex;align-items:center;gap:6px;">ابدأ المحادثة <span>←</span></a>
+          </article>
+
+          <article class="card animate-block delay-2" tabindex="0">
+            <div style="width:52px;height:52px;background:rgba(99,102,241,.15);border-radius:16px;display:grid;place-items:center;font-size:1.6rem;margin-bottom:20px;border:1px solid rgba(99,102,241,.2);">📍</div>
+            <h3 class="h3" style="margin-bottom:10px;">الباحث الذكي عن القاعات</h3>
+            <p class="muted" style="margin-bottom:24px;line-height:1.7;">اعثر على أي قاعة في الحرم الجامعي بسرعة مع خريطة تفاعلية.</p>
+            <a href="locations.html" style="color:var(--accent);font-weight:700;display:inline-flex;align-items:center;gap:6px;">ابحث الآن <span>←</span></a>
+          </article>
+
+          <article class="card animate-block delay-3" tabindex="0">
+            <div style="width:52px;height:52px;background:rgba(16,185,129,.12);border-radius:16px;display:grid;place-items:center;font-size:1.6rem;margin-bottom:20px;border:1px solid rgba(16,185,129,.2);">👤</div>
+            <h3 class="h3" style="margin-bottom:10px;">البروفايل الذكي</h3>
+            <p class="muted" style="margin-bottom:24px;line-height:1.7;">أعدّ بروفايلك الأكاديمي لتخصيص الخطط والتوصيات لاحتياجاتك.</p>
+            <a href="profile.html" style="color:#10b981;font-weight:700;display:inline-flex;align-items:center;gap:6px;">إعداد البروفايل <span>←</span></a>
+          </article>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- Stats Section -->
+    <section class="section" style="border-top:1px solid var(--border);">
+      <div class="container">
+        <div class="grid grid-3 animate-block" style="text-align:center; gap:40px;">
+          <div class="animate-block delay-1">
+            <div class="h1" style="color:var(--accent);margin:0;line-height:1;">+24%</div>
+            <div class="muted" style="margin-top:8px;font-size:1rem;">تحسن في الأداء الأكاديمي</div>
+          </div>
+          <div class="animate-block delay-2">
+            <div class="h1" style="color:var(--accent-2);margin:0;line-height:1;">100%</div>
+            <div class="muted" style="margin-top:8px;font-size:1rem;">خصوصية تامة — تعمل محلياً</div>
+          </div>
+          <div class="animate-block delay-3">
+            <div class="h1" style="color:var(--fg);margin:0;line-height:1;">24/7</div>
+            <div class="muted" style="margin-top:8px;font-size:1rem;">متاح في أي وقت ومكان</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- University News & Ads Section — Mock Placeholders -->
+    <section class="section" id="uquNewsSection">
+      <div class="container">
+        <div class="section-head animate-block" style="text-align:center;">
+          <span class="pill" style="margin-bottom:16px;">📰 أخبار وإعلانات الجامعة</span>
+          <h2 class="h2">آخر أخبار جامعة أم القرى</h2>
+        </div>
+
+        <!-- News Banner Carousel (mock SVG images) -->
+        <div class="uqu-news-banners" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:20px;margin-top:28px;">
+
+          <!-- Banner 1: Academic Calendar -->
+          <a href="https://uqu.edu.sa" target="_blank" rel="noopener" class="uqu-news-card card animate-block">
+            <svg viewBox="0 0 600 260" xmlns="http://www.w3.org/2000/svg" style="width:100%;border-radius:14px 14px 0 0;display:block;">
+              <defs>
+                <linearGradient id="bg1" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#6366f1"/><stop offset="100%" stop-color="#818cf8"/></linearGradient>
+              </defs>
+              <rect width="600" height="260" fill="url(#bg1)" rx="0"/>
+              <text x="300" y="90" text-anchor="middle" fill="rgba(255,255,255,.95)" font-family="Cairo,sans-serif" font-size="28" font-weight="800">التقويم الأكاديمي</text>
+              <text x="300" y="130" text-anchor="middle" fill="rgba(255,255,255,.7)" font-family="Cairo,sans-serif" font-size="18">الفصل الدراسي الثاني 1447هـ</text>
+              <rect x="180" y="160" width="240" height="48" rx="24" fill="rgba(255,255,255,.18)"/>
+              <text x="300" y="190" text-anchor="middle" fill="#fff" font-family="Cairo,sans-serif" font-size="16" font-weight="700">📅 مواعيد الاختبارات</text>
+              <text x="300" y="240" text-anchor="middle" fill="rgba(255,255,255,.35)" font-family="Cairo,sans-serif" font-size="12">uqu.edu.sa</text>
+            </svg>
+            <div style="padding:14px 18px;">
+              <h4 style="font-size:.9rem;font-weight:700;margin:0 0 4px;">تعرف على مواعيد الدراسة والاختبارات</h4>
+              <p style="font-size:.78rem;color:var(--muted);margin:0;">التقويم الأكاديمي المعتمد للفصل الحالي</p>
+            </div>
+          </a>
+
+          <!-- Banner 2: Registration -->
+          <a href="https://uqu.edu.sa" target="_blank" rel="noopener" class="uqu-news-card card animate-block">
+            <svg viewBox="0 0 600 260" xmlns="http://www.w3.org/2000/svg" style="width:100%;border-radius:14px 14px 0 0;display:block;">
+              <defs>
+                <linearGradient id="bg2" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#10b981"/><stop offset="100%" stop-color="#34d399"/></linearGradient>
+              </defs>
+              <rect width="600" height="260" fill="url(#bg2)" rx="0"/>
+              <text x="300" y="90" text-anchor="middle" fill="rgba(255,255,255,.95)" font-family="Cairo,sans-serif" font-size="28" font-weight="800">القبول والتسجيل</text>
+              <text x="300" y="130" text-anchor="middle" fill="rgba(255,255,255,.7)" font-family="Cairo,sans-serif" font-size="18">بوابة القبول الإلكترونية</text>
+              <rect x="200" y="160" width="200" height="48" rx="24" fill="rgba(255,255,255,.18)"/>
+              <text x="300" y="190" text-anchor="middle" fill="#fff" font-family="Cairo,sans-serif" font-size="16" font-weight="700">📝 سجّل الآن</text>
+              <text x="300" y="240" text-anchor="middle" fill="rgba(255,255,255,.35)" font-family="Cairo,sans-serif" font-size="12">uqu.edu.sa/admission</text>
+            </svg>
+            <div style="padding:14px 18px;">
+              <h4 style="font-size:.9rem;font-weight:700;margin:0 0 4px;">فتح باب القبول للفصل القادم</h4>
+              <p style="font-size:.78rem;color:var(--muted);margin:0;">تقديم طلبات القبول والتحويل إلكترونيًا</p>
+            </div>
+          </a>
+
+          <!-- Banner 3: Digital Library -->
+          <a href="https://uqu.edu.sa" target="_blank" rel="noopener" class="uqu-news-card card animate-block">
+            <svg viewBox="0 0 600 260" xmlns="http://www.w3.org/2000/svg" style="width:100%;border-radius:14px 14px 0 0;display:block;">
+              <defs>
+                <linearGradient id="bg3" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#f59e0b"/><stop offset="100%" stop-color="#fbbf24"/></linearGradient>
+              </defs>
+              <rect width="600" height="260" fill="url(#bg3)" rx="0"/>
+              <text x="300" y="90" text-anchor="middle" fill="rgba(255,255,255,.95)" font-family="Cairo,sans-serif" font-size="28" font-weight="800">المكتبة الرقمية</text>
+              <text x="300" y="130" text-anchor="middle" fill="rgba(255,255,255,.7)" font-family="Cairo,sans-serif" font-size="18">آلاف المراجع والأبحاث</text>
+              <rect x="190" y="160" width="220" height="48" rx="24" fill="rgba(255,255,255,.18)"/>
+              <text x="300" y="190" text-anchor="middle" fill="#fff" font-family="Cairo,sans-serif" font-size="16" font-weight="700">📚 تصفّح المكتبة</text>
+              <text x="300" y="240" text-anchor="middle" fill="rgba(255,255,255,.35)" font-family="Cairo,sans-serif" font-size="12">uqu.edu.sa/lib</text>
+            </svg>
+            <div style="padding:14px 18px;">
+              <h4 style="font-size:.9rem;font-weight:700;margin:0 0 4px;">موارد البحث العلمي وقواعد البيانات</h4>
+              <p style="font-size:.78rem;color:var(--muted);margin:0;">مراجع إلكترونية متاحة لجميع الطلاب</p>
+            </div>
+          </a>
+
+        </div>
+
+        <!-- Dynamic feed from RSS / X (auto-populated by uqu-news.js) -->
+        <div id="uquNewsGrid"
+             style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;margin-top:28px;">
+        </div>
+
+        <div style="text-align:center;margin-top:24px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
+          <a href="https://uqu.edu.sa" target="_blank" rel="noopener" class="btn-ghost" style="font-size:.85rem;">
+            زيارة موقع الجامعة ←
+          </a>
+          <a href="https://x.com/UmmAlQuraUniv" target="_blank" rel="noopener" class="btn-ghost"
+             style="font-size:.85rem;display:inline-flex;align-items:center;gap:6px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+            </svg>
+            تابعنا على إكس
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="section">
+      <div class="container">
+        <div class="card animate-block" style="background:linear-gradient(135deg,var(--accent),hsl(260,75%,55%),var(--accent-2));border:none;padding:clamp(32px,5vw,56px);text-align:center;">
+          <div class="aurora-blob" style="width:300px;height:300px;top:-100px;right:-100px;background:rgba(255,255,255,.06);position:absolute;"></div>
+          <h2 class="h2" style="color:#fff;margin-bottom:12px;">هل أنت مستعد للانطلاق؟</h2>
+          <p style="color:rgba(255,255,255,.85);font-size:1.1rem;margin-bottom:32px;max-width:480px;margin-inline:auto;">أعدّ بروفايلك الأكاديمي الآن واحصل على خطة دراسة مخصصة لك خلال دقائق.</p>
+          <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap;">
+            <a href="profile.html" style="padding:14px 32px;border-radius:14px;background:#fff;color:var(--accent);font-weight:800;font-size:1rem;transition:transform .2s,box-shadow .2s;box-shadow:0 8px 24px rgba(0,0,0,.2);">إعداد البروفايل ←</a>
+            <a href="chat.html" style="padding:14px 32px;border-radius:14px;background:rgba(255,255,255,.15);color:#fff;font-weight:700;font-size:1rem;border:1px solid rgba(255,255,255,.3);">تحدث مع المساعد</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="app-footer" role="contentinfo">
+    <div class="container foot-inner">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span class="brand-logo" style="width:28px;height:28px;border-radius:8px;" aria-hidden="true"></span>
+        <span style="font-weight:700;">المساعد الأكاديمي</span>
+      </div>
+      <span>© <span id="year"></span> — جامعة أم القرى</span>
+      <div style="display:flex;gap:16px;">
+        <a href="dashboard.html" style="color:var(--muted);font-size:.85rem;transition:color .2s;">اللوحة</a>
+        <a href="chat.html" style="color:var(--muted);font-size:.85rem;transition:color .2s;">الدردشة</a>
+        <a href="profile.html" style="color:var(--muted);font-size:.85rem;transition:color .2s;">البروفايل</a>
+      </div>
+    </div>
+  </footer>
+
+  <link rel="manifest" href="manifest.json" />
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script src="assets/firebase-config.js"></script>
+
+  <!-- Keyboard shortcut hint -->
+  <div id="shortcut-hint">اضغط <kbd>⌘K</kbd> للبحث السريع</div>
+
+  <!-- Neon Grid Background -->
+
+  <!-- Core libraries -->
+  <script src="assets/core.js" defer></script>
+  <script src="assets/data-bridge.js" defer></script>
+  <script src="assets/auth.js" defer></script>
+  <script src="assets/notifications.js" defer></script>
+  <script src="assets/student-model.js" defer></script>
+  <script src="assets/engine.js" defer></script>
+  <script src="assets/actions.js" defer></script>
+  <!-- AI + Effects -->
+  <script src="assets/ai.js" defer></script>
+  <script src="assets/effects.js" defer></script>
+  <script src="assets/charts.js" defer></script>
+  <script src="assets/ux.js" defer></script>
+  <!-- App logic -->
+  <script src="assets/achievements.js" defer></script>
+  <script src="assets/data-io.js" defer></script>
+  <script src="assets/app.js" defer></script>
+  <script>
+    // Register Service Worker (PWA)
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(() => {});
+      });
+    }
+  </script>
+  <!-- Dynamic news (RSS + X fallback) populates #uquNewsGrid below the static banners -->
+  <script src="assets/uqu-news.js" defer></script>
+  <script src="assets/ai-fab.js" defer></script>
+</body>
+</html>

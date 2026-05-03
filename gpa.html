@@ -1,0 +1,493 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>حاسبة المعدل — المساعد الأكاديمي</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+
+<body class="app" data-theme="auto" data-page="gpa">
+
+  <header class="app-header">
+    <div class="container header-inner">
+      <a class="brand" href="index.html">
+        <span class="brand-logo" aria-hidden="true"></span>
+        <span class="brand-name">المساعد الأكاديمي</span>
+        <span class="badge">UQU</span>
+      </a>
+      <nav class="nav">
+        <button class="nav-toggle" aria-expanded="false">☰</button>
+        <ul id="main-menu">
+          <li><a href="dashboard.html">اللوحة</a></li>
+          <li><a href="chat.html">الدردشة</a></li>
+          <li><a href="gpa.html" aria-current="page">المعدل</a></li>
+          <li><a href="plan.html">الخطة</a></li>
+          <li><a href="pomodoro.html">بومودورو</a></li>
+          <li><a href="locations.html">القاعات</a></li>
+        </ul>
+      </nav>
+      <div class="header-actions">
+        <button id="themeToggle" class="btn-ghost">🌓</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="app-main" style="min-height:90vh;">
+    <div class="aurora-blob blob-1" style="opacity:.15;"></div>
+
+    <section class="section">
+      <div class="container">
+
+        <!-- Page header -->
+        <div class="gpa-page-header animate-block">
+          <div>
+            <div class="pill" style="margin-bottom:12px;align-self:flex-start;">
+              <span>🧮</span>
+              <span>حاسبة المعدّل الذكية — UQU Academic Assistant</span>
+            </div>
+            <h2 class="h2" style="margin-bottom:8px;">راقب معدّلك لحظة بلحظة</h2>
+            <p class="muted" style="max-width:600px;line-height:1.75;">
+              أدخل المعدّل الحالي ومواد هذا الفصل، ودع النظام يحسب لك تلقائيّاً المعدّل الجديد،
+              معدل الترم، وعدد الساعات المتبقية في خطتك الأكاديمية.
+            </p>
+          </div>
+          <div class="gpa-tag-row">
+            <span class="gpa-badge-soft">⚡ تحديث فوري عند أي تغيير</span>
+            <span class="gpa-badge-soft">🧠 متكاملة مع بيانات البروفايل</span>
+            <span class="gpa-badge-soft">💾 تحفظ تلقائياً في المتصفح</span>
+          </div>
+        </div>
+
+        <!-- Main layout: left = inputs, right = stats -->
+        <div class="grid grid-2 gpa-layout" style="gap:24px;">
+
+          <!-- Left: inputs -->
+          <div class="gpa-main-panel">
+
+            <!-- Current data card -->
+            <div class="card animate-block delay-1 gpa-card">
+              <div class="gpa-card-head">
+                <div>
+                  <h3 class="h3" style="margin-bottom:4px;font-size:1rem;">بياناتك الحالية</h3>
+                  <p class="muted" style="font-size:.82rem;">أرقامك قبل إضافة درجات هذا الفصل.</p>
+                </div>
+                <span class="gpa-badge-mini">الخطوة 1</span>
+              </div>
+              <div class="gpa-input-grid">
+                <div>
+                  <label class="lbl" for="curGpa">المعدل التراكمي الحالي</label>
+                  <input type="number" id="curGpa" step="0.01" min="0" max="5" placeholder="مثلاً 3.50" />
+                </div>
+                <div>
+                  <label class="lbl" for="earnedHours">الساعات المنجزة</label>
+                  <input type="number" id="earnedHours" placeholder="مثلاً 60" min="0" />
+                </div>
+                <div>
+                  <label class="lbl" for="totalPlanHours">إجمالي ساعات الخطة</label>
+                  <input type="number" id="totalPlanHours" value="130" placeholder="مثلاً 130" min="0" />
+                </div>
+              </div>
+            </div>
+
+            <!-- Courses card -->
+            <div class="card animate-block delay-2 gpa-card" style="padding:0;overflow:hidden;">
+              <div class="gpa-card-head gpa-card-head-strip">
+                <div>
+                  <h3 class="h3" style="margin-bottom:4px;font-size:1rem;">مواد هذا الفصل</h3>
+                  <p class="muted" style="font-size:.78rem;">أضف كل مادة مع ساعاتها والتقدير المتوقع.</p>
+                </div>
+                <button id="addCourse" class="btn-primary" type="button" style="padding:8px 18px;font-size:.82rem;">
+                  + إضافة
+                </button>
+              </div>
+              <div id="coursesWrap" style="padding:16px;display:flex;flex-direction:column;gap:10px;">
+                <!-- Course rows injected by JS -->
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Right: stats panel -->
+          <aside class="gpa-side-panel animate-block delay-3">
+
+            <!-- Main GPA display -->
+            <div class="card gpa-main-metric">
+              <div class="gpa-main-metric-top">
+                <div>
+                  <p style="font-size:.78rem;opacity:.85;margin-bottom:6px;">
+                    المعدّل التراكمي بعد هذا الفصل
+                  </p>
+                  <div id="newGpa">0.00</div>
+                  <p style="font-size:.78rem;margin-top:10px;opacity:.80;">
+                    يتحدث تلقائياً مع أي تعديل في الدرجات.
+                  </p>
+                </div>
+                <div class="gpa-main-badge">
+                  <span>📊</span>
+                  <span>حساب لحظي</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Secondary stats -->
+            <div class="gpa-stats-grid">
+              <div class="card gpa-stat-card">
+                <div class="muted" style="font-size:.75rem;">معدل الفصل</div>
+                <div id="termGpa" class="gpa-stat-value accent">0.00</div>
+                <div class="gpa-stat-hint">متوسط درجات مواد هذا الترم.</div>
+              </div>
+              <div class="card gpa-stat-card">
+                <div class="muted" style="font-size:.75rem;">الساعات المتبقية</div>
+                <div id="remainingHours" class="gpa-stat-value danger">--</div>
+                <div class="gpa-stat-hint">لإكمال خطتك الأكاديمية.</div>
+              </div>
+              <div class="card gpa-stat-card">
+                <div class="muted" style="font-size:.75rem;">ساعات الترم</div>
+                <div id="termHours" class="gpa-stat-value">0</div>
+                <div class="gpa-stat-hint">إجمالي ساعات هذا الفصل.</div>
+              </div>
+              <div class="card gpa-stat-card">
+                <div class="muted" style="font-size:.75rem;">الإجمالي المنجز</div>
+                <div id="totalEarned" class="gpa-stat-value success">0</div>
+                <div class="gpa-stat-hint">الساعات حتى الآن.</div>
+              </div>
+            </div>
+
+            <!-- Reset button -->
+            <button id="resetBtn" class="btn-ghost" type="button" style="width:100%;margin-top:12px;color:var(--danger);border-color:var(--border);">
+              <span>↺</span>
+              <span>إعادة تعيين الحاسبة</span>
+            </button>
+
+            <p class="muted" style="font-size:.75rem;margin-top:8px;text-align:center;">
+              يتم حفظ بياناتك تلقائياً في المتصفح.
+            </p>
+
+            <!-- Quick links -->
+            <div style="margin-top:16px;padding:16px;background:var(--surface-2);border-radius:14px;border:1px solid var(--border);">
+              <div style="font-size:.82rem;font-weight:700;margin-bottom:10px;color:var(--muted);">روابط سريعة</div>
+              <div style="display:flex;flex-direction:column;gap:6px;">
+                <a href="dashboard.html" style="font-size:.82rem;color:var(--accent);display:flex;align-items:center;gap:6px;">📊 عرض في اللوحة</a>
+                <a href="profile.html" style="font-size:.82rem;color:var(--accent);display:flex;align-items:center;gap:6px;">👤 تحديث البروفايل</a>
+                <a href="chat.html" style="font-size:.82rem;color:var(--accent);display:flex;align-items:center;gap:6px;">💬 اسأل المساعد</a>
+              </div>
+            </div>
+
+          </aside>
+
+        </div>
+
+        <!-- ═══════════════════════════════════════════════════════
+             SEMESTER HISTORY MANAGEMENT
+             ═══════════════════════════════════════════════════════ -->
+        <div class="animate-block delay-4" style="margin-top:32px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+            <div>
+              <div class="pill" style="margin-bottom:8px;align-self:flex-start;">
+                <span>📚</span>
+                <span>سجل الفصول الدراسية</span>
+              </div>
+              <h3 class="h3" style="margin:0;font-size:1.05rem;">إدارة السجل الأكاديمي</h3>
+              <p class="muted" style="font-size:.82rem;margin-top:4px;">أضف فصولك السابقة لتحليل أداءك الأكاديمي واستخدامها في تشخيص نقاط القوة والضعف.</p>
+            </div>
+            <button id="addSemBtn" class="btn-primary" type="button" style="padding:10px 20px;font-size:.85rem;white-space:nowrap;">
+              + إضافة فصل
+            </button>
+          </div>
+
+          <!-- Add Semester Form (hidden initially) -->
+          <div id="semFormWrap" style="display:none;margin-bottom:20px;">
+            <div class="card gpa-card" style="border:2px solid var(--accent);padding:20px;">
+              <h4 style="margin:0 0 16px;font-size:.95rem;color:var(--accent);">➕ فصل دراسي جديد</h4>
+              <div class="gpa-input-grid" style="margin-bottom:16px;">
+                <div>
+                  <label class="lbl" for="semName">اسم الفصل</label>
+                  <input type="text" id="semName" placeholder="مثلاً: الفصل الأول 2024" />
+                </div>
+                <div>
+                  <label class="lbl" for="semYear">العام الأكاديمي</label>
+                  <input type="text" id="semYear" placeholder="مثلاً: 2023-2024" />
+                </div>
+              </div>
+
+              <!-- Courses within new semester -->
+              <div style="margin-bottom:12px;">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                  <span style="font-size:.85rem;font-weight:600;">المواد الدراسية</span>
+                  <button id="addSemCourse" class="btn-ghost" type="button" style="font-size:.78rem;padding:5px 12px;">+ مادة</button>
+                </div>
+                <div id="semCoursesWrap" style="display:flex;flex-direction:column;gap:8px;">
+                  <!-- Courses injected here -->
+                </div>
+              </div>
+
+              <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
+                <button id="cancelSemBtn" class="btn-ghost" type="button" style="padding:8px 18px;font-size:.85rem;">إلغاء</button>
+                <button id="saveSemBtn" class="btn-primary" type="button" style="padding:8px 20px;font-size:.85rem;">💾 حفظ الفصل</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Existing Semesters List -->
+          <div id="semestersList" style="display:flex;flex-direction:column;gap:14px;">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+
+      </div>
+    </section>
+  </main>
+
+  <link rel="manifest" href="manifest.json" />
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script src="assets/firebase-config.js"></script>
+
+  <!-- Keyboard shortcut hint -->
+  <div id="shortcut-hint">اضغط <kbd>⌘K</kbd> للبحث السريع</div>
+
+  <!-- Core libraries -->
+  <script src="assets/core.js" defer></script>
+  <script src="assets/data-bridge.js" defer></script>
+  <script src="assets/auth.js" defer></script>
+  <script src="assets/firebase-auth.js" defer></script>
+  <script src="assets/firebase-db.js" defer></script>
+  <script src="assets/notifications.js" defer></script>
+  <script src="assets/student-model.js" defer></script>
+  <script src="assets/engine.js" defer></script>
+  <script src="assets/actions.js" defer></script>
+  <!-- AI + Effects -->
+  <script src="assets/ai.js" defer></script>
+  <script src="assets/effects.js" defer></script>
+  <script src="assets/charts.js" defer></script>
+  <script src="assets/ux.js" defer></script>
+  <!-- App logic -->
+  <script src="assets/achievements.js" defer></script>
+  <script src="assets/data-io.js" defer></script>
+  <script src="assets/diagnostics.js" defer></script>
+  <script src="assets/profile-guard.js" defer></script>
+  <script src="assets/app.js" defer></script>
+  <script>
+    // Register Service Worker (PWA)
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(() => {});
+      });
+    }
+  </script>
+  <script src="assets/ai-fab.js" defer></script>
+
+  <!-- Neon Grid Background -->
+
+  <!-- Semester History Management -->
+  <script>
+  (function() {
+    'use strict';
+
+    var SEM_KEY = 'uqu_semesters';
+
+    var GRADE_POINTS = {
+      'A+':5,'A':4.75,'A-':4.5,'B+':4.25,'B':4,'B-':3.75,
+      'C+':3.5,'C':3,'C-':2.5,'D+':2.25,'D':2,'D-':1.75,'F':0
+    };
+
+    function loadSemesters() {
+      try { return JSON.parse(localStorage.getItem(SEM_KEY) || '[]'); }
+      catch(e) { return []; }
+    }
+
+    function saveSemesters(data) {
+      localStorage.setItem(SEM_KEY, JSON.stringify(data));
+    }
+
+    function calcSemGpa(courses) {
+      var pts = 0, hrs = 0;
+      courses.forEach(function(c) {
+        var cr = parseFloat(c.credits) || 0;
+        var gp = GRADE_POINTS[c.grade] != null ? GRADE_POINTS[c.grade] : 0;
+        pts += cr * gp;
+        hrs += cr;
+      });
+      return hrs > 0 ? (pts / hrs).toFixed(2) : '0.00';
+    }
+
+    function gradeColor(grade) {
+      var gp = GRADE_POINTS[grade];
+      if (gp == null) return 'var(--muted)';
+      if (gp >= 4.5) return 'var(--success)';
+      if (gp >= 3.5) return 'var(--accent)';
+      if (gp >= 2.5) return 'var(--warning)';
+      return 'var(--danger)';
+    }
+
+    function renderSemesterCard(sem, idx) {
+      var gpa = calcSemGpa(sem.courses || []);
+      var totalHrs = (sem.courses || []).reduce(function(s,c){ return s + (parseFloat(c.credits)||0); }, 0);
+      var gpaColor = parseFloat(gpa) >= 4 ? 'var(--success)'
+        : parseFloat(gpa) >= 3 ? 'var(--accent)'
+        : parseFloat(gpa) >= 2 ? 'var(--warning)'
+        : 'var(--danger)';
+
+      var coursesHtml = '';
+      if (sem.courses && sem.courses.length > 0) {
+        coursesHtml = '<table style="width:100%;border-collapse:collapse;margin-top:12px;font-size:.78rem;">'
+          + '<thead><tr style="border-bottom:1px solid var(--border);">'
+          + '<th style="text-align:right;padding:4px 8px;color:var(--muted);font-weight:600;">المادة</th>'
+          + '<th style="text-align:center;padding:4px 8px;color:var(--muted);font-weight:600;">الكود</th>'
+          + '<th style="text-align:center;padding:4px 8px;color:var(--muted);font-weight:600;">الساعات</th>'
+          + '<th style="text-align:center;padding:4px 8px;color:var(--muted);font-weight:600;">التقدير</th>'
+          + '</tr></thead><tbody>';
+        sem.courses.forEach(function(c) {
+          coursesHtml += '<tr style="border-bottom:1px solid var(--border);">'
+            + '<td style="padding:5px 8px;">' + (c.name || '—') + '</td>'
+            + '<td style="padding:5px 8px;text-align:center;color:var(--muted);">' + (c.code || '—') + '</td>'
+            + '<td style="padding:5px 8px;text-align:center;">' + (c.credits || '—') + '</td>'
+            + '<td style="padding:5px 8px;text-align:center;font-weight:700;color:' + gradeColor(c.grade) + ';">' + (c.grade || '—') + '</td>'
+            + '</tr>';
+        });
+        coursesHtml += '</tbody></table>';
+      } else {
+        coursesHtml = '<p class="muted" style="font-size:.78rem;margin-top:8px;text-align:center;">لا توجد مواد مسجلة لهذا الفصل.</p>';
+      }
+
+      return '<div class="card gpa-card" style="padding:0;overflow:hidden;" data-sem-idx="' + idx + '">'
+        + '<div class="gpa-card-head gpa-card-head-strip" style="cursor:pointer;" onclick="toggleSemDetails(' + idx + ')">'
+        + '<div style="display:flex;align-items:center;gap:14px;">'
+        + '<div style="width:48px;height:48px;background:var(--surface-2);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.2rem;">📘</div>'
+        + '<div>'
+        + '<div style="font-weight:700;font-size:.92rem;">' + (sem.name || 'فصل دراسي') + '</div>'
+        + '<div class="muted" style="font-size:.75rem;">' + (sem.year || '') + ' · ' + totalHrs + ' ساعة</div>'
+        + '</div></div>'
+        + '<div style="display:flex;align-items:center;gap:12px;">'
+        + '<div style="text-align:center;">'
+        + '<div style="font-size:1.4rem;font-weight:800;color:' + gpaColor + ';">' + gpa + '</div>'
+        + '<div class="muted" style="font-size:.7rem;">معدل الفصل</div>'
+        + '</div>'
+        + '<button onclick="event.stopPropagation();deleteSemester(' + idx + ')" class="btn-ghost" style="padding:4px 10px;font-size:.78rem;color:var(--danger);border-color:var(--danger);" title="حذف الفصل">✕</button>'
+        + '</div></div>'
+        + '<div id="sem-details-' + idx + '" style="display:none;padding:0 16px 16px;">' + coursesHtml + '</div>'
+        + '</div>';
+    }
+
+    function renderSemesters() {
+      var list = document.getElementById('semestersList');
+      if (!list) return;
+      var sems = loadSemesters();
+      if (sems.length === 0) {
+        list.innerHTML = '<div style="text-align:center;padding:32px 16px;background:var(--surface-2);border-radius:16px;border:1px dashed var(--border);">'
+          + '<div style="font-size:2rem;opacity:.35;margin-bottom:8px;">📚</div>'
+          + '<div style="font-weight:600;font-size:.9rem;margin-bottom:4px;">لا توجد فصول مسجلة بعد</div>'
+          + '<p class="muted" style="font-size:.8rem;">أضف فصولك السابقة لتفعيل التحليل الأكاديمي الذكي.</p>'
+          + '</div>';
+        return;
+      }
+      list.innerHTML = sems.map(function(sem, i) { return renderSemesterCard(sem, i); }).join('');
+    }
+
+    window.toggleSemDetails = function(idx) {
+      var el = document.getElementById('sem-details-' + idx);
+      if (!el) return;
+      el.style.display = el.style.display === 'none' ? 'block' : 'none';
+    };
+
+    window.deleteSemester = function(idx) {
+      if (!confirm('هل تريد حذف هذا الفصل نهائياً؟')) return;
+      var sems = loadSemesters();
+      sems.splice(idx, 1);
+      saveSemesters(sems);
+      renderSemesters();
+    };
+
+    // ── Course rows inside the add-semester form ──────────────────
+    var semCourseCount = 0;
+
+    function addSemCourseRow() {
+      semCourseCount++;
+      var id = 'sc_' + semCourseCount;
+      var row = document.createElement('div');
+      row.id = id;
+      row.style.cssText = 'display:grid;grid-template-columns:2fr 1fr 1fr 1fr auto;gap:8px;align-items:center;';
+      row.innerHTML = '<input type="text" placeholder="اسم المادة" class="sc-name" style="font-size:.8rem;"/>'
+        + '<input type="text" placeholder="الكود" class="sc-code" style="font-size:.8rem;"/>'
+        + '<input type="number" placeholder="الساعات" min="1" max="6" class="sc-credits" style="font-size:.8rem;"/>'
+        + '<select class="sc-grade" style="font-size:.8rem;padding:8px 6px;">'
+        + ['A+','A','A-','B+','B','B-','C+','C','C-','D+','D','D-','F'].map(function(g){
+            return '<option value="' + g + '">' + g + '</option>';
+          }).join('')
+        + '</select>'
+        + '<button type="button" onclick="this.closest(\'[id^=sc_]\').remove()" class="btn-ghost" style="padding:4px 8px;color:var(--danger);font-size:.8rem;">✕</button>';
+      document.getElementById('semCoursesWrap').appendChild(row);
+    }
+
+    function collectSemCourses() {
+      var rows = document.querySelectorAll('#semCoursesWrap [id^="sc_"]');
+      var courses = [];
+      rows.forEach(function(row) {
+        var name = row.querySelector('.sc-name').value.trim();
+        var code = row.querySelector('.sc-code').value.trim();
+        var credits = row.querySelector('.sc-credits').value.trim();
+        var grade = row.querySelector('.sc-grade').value;
+        if (name && credits) {
+          courses.push({ name: name, code: code, credits: parseFloat(credits) || 3, grade: grade });
+        }
+      });
+      return courses;
+    }
+
+    function showSemForm() {
+      semCourseCount = 0;
+      document.getElementById('semName').value = '';
+      document.getElementById('semYear').value = '';
+      document.getElementById('semCoursesWrap').innerHTML = '';
+      addSemCourseRow(); // Start with one empty row
+      document.getElementById('semFormWrap').style.display = 'block';
+      document.getElementById('addSemBtn').style.display = 'none';
+      document.getElementById('semFormWrap').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    function hideSemForm() {
+      document.getElementById('semFormWrap').style.display = 'none';
+      document.getElementById('addSemBtn').style.display = '';
+    }
+
+    function saveSemester() {
+      var name = document.getElementById('semName').value.trim();
+      if (!name) { alert('يرجى إدخال اسم الفصل الدراسي.'); return; }
+      var courses = collectSemCourses();
+      var sem = {
+        id: 'sem_' + Date.now(),
+        name: name,
+        year: document.getElementById('semYear').value.trim(),
+        courses: courses
+      };
+      var sems = loadSemesters();
+      sems.push(sem);
+      saveSemesters(sems);
+      hideSemForm();
+      renderSemesters();
+    }
+
+    // ── Init ─────────────────────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', function() {
+      renderSemesters();
+
+      var addSemBtn = document.getElementById('addSemBtn');
+      var addSemCourse = document.getElementById('addSemCourse');
+      var cancelSemBtn = document.getElementById('cancelSemBtn');
+      var saveSemBtn = document.getElementById('saveSemBtn');
+
+      if (addSemBtn) addSemBtn.addEventListener('click', showSemForm);
+      if (addSemCourse) addSemCourse.addEventListener('click', addSemCourseRow);
+      if (cancelSemBtn) cancelSemBtn.addEventListener('click', hideSemForm);
+      if (saveSemBtn) saveSemBtn.addEventListener('click', saveSemester);
+    });
+  })();
+  </script>
+</body>
+</html>

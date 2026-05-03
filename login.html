@@ -1,0 +1,1056 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
+  <meta name="description" content="تسجيل الدخول — المساعد الأكاديمي الذكي لجامعة أم القرى" />
+  <meta name="theme-color" content="#09091a" />
+  <title>تسجيل الدخول — المساعد الأكاديمي</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/styles.css" />
+
+  <style>
+    /* ── Login Page Exclusive Styles ── */
+    html, body { height: 100%; margin: 0; }
+
+    .login-root {
+      min-height: 100vh;
+      display: flex;
+      position: relative;
+      overflow: hidden;
+      background: var(--bg);
+    }
+
+    /* ── Brand Panel (right in RTL) ── */
+    .login-brand {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: flex-start;
+      padding: clamp(32px, 5vw, 64px) clamp(32px, 5vw, 72px);
+      position: relative;
+      overflow: hidden;
+      background: linear-gradient(145deg, #09091a 0%, #0f0f2e 50%, #0b0b20 100%);
+    }
+
+    .login-brand::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 80% 70% at 20% 20%, rgba(99,102,241,.18) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 80% at 80% 80%, rgba(6,182,212,.12) 0%, transparent 60%);
+      pointer-events: none;
+    }
+
+    .brand-hero {
+      position: relative;
+      z-index: 2;
+      max-width: 480px;
+    }
+
+    .brand-logo-large {
+      width: 64px; height: 64px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      border-radius: 20px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 2rem;
+      margin-bottom: 28px;
+      box-shadow: 0 8px 32px rgba(99,102,241,.35);
+      animation: logoPulse 3s ease-in-out infinite;
+    }
+
+    @keyframes logoPulse {
+      0%, 100% { box-shadow: 0 8px 32px rgba(99,102,241,.35); }
+      50%       { box-shadow: 0 8px 48px rgba(99,102,241,.55), 0 0 0 8px rgba(99,102,241,.08); }
+    }
+
+    .brand-title {
+      font-size: clamp(2rem, 4vw, 3rem);
+      font-weight: 900;
+      line-height: 1.15;
+      color: #fff;
+      margin-bottom: 16px;
+    }
+
+    .brand-title span {
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .brand-subtitle {
+      color: rgba(255,255,255,.65);
+      font-size: 1.05rem;
+      line-height: 1.7;
+      margin-bottom: 40px;
+      max-width: 380px;
+    }
+
+    .brand-features {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .brand-feature {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 12px 16px;
+      background: rgba(255,255,255,.06);
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 14px;
+      transition: background .2s, border-color .2s;
+      animation: featureIn .5s ease forwards;
+      opacity: 0;
+    }
+
+    .brand-feature:nth-child(1) { animation-delay: .1s; }
+    .brand-feature:nth-child(2) { animation-delay: .2s; }
+    .brand-feature:nth-child(3) { animation-delay: .3s; }
+    .brand-feature:nth-child(4) { animation-delay: .4s; }
+
+    @keyframes featureIn {
+      from { opacity: 0; transform: translateX(-16px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+
+    .brand-feature:hover {
+      background: rgba(255,255,255,.09);
+      border-color: rgba(255,255,255,.14);
+    }
+
+    .feature-icon {
+      width: 38px; height: 38px;
+      background: linear-gradient(135deg, rgba(99,102,241,.2), rgba(6,182,212,.15));
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.1rem;
+      flex-shrink: 0;
+    }
+
+    .feature-text { font-size: .9rem; font-weight: 600; color: rgba(255,255,255,.85); }
+    .feature-desc { font-size: .75rem; color: rgba(255,255,255,.45); margin-top: 2px; }
+
+    /* Floating decorative dots */
+    .float-dot {
+      position: absolute;
+      border-radius: 50%;
+      pointer-events: none;
+      animation: floatUp linear infinite;
+    }
+
+    @keyframes floatUp {
+      from { transform: translateY(0) rotate(0deg); opacity: .6; }
+      to   { transform: translateY(-120px) rotate(360deg); opacity: 0; }
+    }
+
+    /* ── Form Panel (left in RTL) ── */
+    .login-form-panel {
+      width: clamp(360px, 42vw, 520px);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: clamp(24px, 5vw, 64px) clamp(24px, 5vw, 56px);
+      background: var(--surface);
+      border-right: 1px solid var(--border); /* RTL: border on right side */
+      position: relative;
+      z-index: 10;
+      overflow-y: auto;
+    }
+
+    /* ── Form Header ── */
+    .form-header {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+
+    .form-header .logo-mini {
+      width: 48px; height: 48px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.4rem;
+      margin: 0 auto 16px;
+      box-shadow: 0 4px 16px rgba(99,102,241,.3);
+    }
+
+    .form-title { font-size: 1.5rem; font-weight: 900; margin: 0 0 6px; }
+    .form-subtitle { color: var(--muted); font-size: .9rem; }
+
+    /* ── Tabs ── */
+    .auth-tabs {
+      display: flex;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 4px;
+      margin-bottom: 28px;
+    }
+
+    .auth-tab {
+      flex: 1;
+      padding: 9px;
+      text-align: center;
+      border-radius: 10px;
+      font-weight: 700;
+      font-size: .88rem;
+      cursor: pointer;
+      transition: background .2s, color .2s, box-shadow .2s;
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      font-family: inherit;
+    }
+
+    .auth-tab.active {
+      background: var(--accent);
+      color: #fff;
+      box-shadow: 0 4px 12px rgba(99,102,241,.35);
+    }
+
+    /* ── Form Inputs ── */
+    .form-group {
+      margin-bottom: 18px;
+      position: relative;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: .82rem;
+      font-weight: 700;
+      color: var(--fg-2);
+      margin-bottom: 6px;
+    }
+
+    .input-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .input-icon {
+      position: absolute;
+      right: 14px;
+      color: var(--muted);
+      font-size: 1rem;
+      pointer-events: none;
+      z-index: 1;
+      transition: color .2s;
+    }
+
+    .form-group input {
+      width: 100%;
+      padding: 12px 42px 12px 16px;
+      background: var(--surface-2);
+      border: 1.5px solid var(--border);
+      border-radius: var(--r-md);
+      color: var(--fg);
+      -webkit-text-fill-color: var(--fg);
+      caret-color: var(--accent);
+      font-family: inherit;
+      font-size: .95rem;
+      transition: border-color .2s, box-shadow .2s, background .2s;
+      box-sizing: border-box;
+    }
+
+    .form-group input::placeholder {
+      color: var(--muted);
+      opacity: 1;
+    }
+
+    /* Override browser autofill that forces black text on white bg */
+    .form-group input:-webkit-autofill,
+    .form-group input:-webkit-autofill:hover,
+    .form-group input:-webkit-autofill:focus,
+    .form-group input:-webkit-autofill:active {
+      -webkit-text-fill-color: var(--fg) !important;
+      -webkit-box-shadow: 0 0 0 1000px var(--surface-2) inset !important;
+      box-shadow: 0 0 0 1000px var(--surface-2) inset !important;
+      caret-color: var(--accent);
+      transition: background-color 5000s ease-in-out 0s;
+    }
+
+    .form-group input:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-dim);
+      background: var(--card-solid);
+      color: var(--fg);
+      -webkit-text-fill-color: var(--fg);
+    }
+
+    .form-group input:focus + .input-icon,
+    .input-wrapper:focus-within .input-icon {
+      color: var(--accent);
+    }
+
+    .toggle-password {
+      position: absolute;
+      left: 14px;
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: .85rem;
+      padding: 0;
+      z-index: 1;
+      transition: color .2s;
+    }
+    .toggle-password:hover { color: var(--fg); }
+
+    /* ── Remember & Forgot ── */
+    .form-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: .82rem;
+      color: var(--muted);
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .checkbox-label input[type="checkbox"] {
+      width: 16px; height: 16px;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+
+    .forgot-link {
+      font-size: .82rem;
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 600;
+      transition: opacity .2s;
+    }
+    .forgot-link:hover { opacity: .8; text-decoration: underline; }
+
+    /* ── Submit Button ── */
+    .btn-auth {
+      width: 100%;
+      padding: 13px;
+      border-radius: var(--r-md);
+      background: linear-gradient(135deg, var(--accent), hsl(260,75%,55%));
+      color: #fff;
+      font-family: inherit;
+      font-size: 1rem;
+      font-weight: 800;
+      border: none;
+      cursor: pointer;
+      transition: transform .15s, box-shadow .2s, opacity .2s;
+      box-shadow: 0 4px 16px rgba(99,102,241,.35);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .btn-auth::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: rgba(255,255,255,.12);
+      opacity: 0;
+      transition: opacity .2s;
+    }
+
+    .btn-auth:hover::before { opacity: 1; }
+    .btn-auth:active { transform: scale(.97); }
+    .btn-auth:disabled { opacity: .6; cursor: not-allowed; transform: none; }
+
+    .btn-auth.loading { pointer-events: none; }
+    .btn-auth .btn-text { transition: opacity .2s; }
+    .btn-auth .btn-spinner { display: none; width: 18px; height: 18px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; margin: 0 auto; }
+    .btn-auth.loading .btn-text { display: none; }
+    .btn-auth.loading .btn-spinner { display: block; }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Divider ── */
+    .auth-divider {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 20px 0;
+      color: var(--muted);
+      font-size: .8rem;
+      font-weight: 600;
+    }
+    .auth-divider::before,
+    .auth-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    /* ── Google Button ── */
+    .btn-google {
+      width: 100%;
+      padding: 11px;
+      border-radius: var(--r-md);
+      background: var(--surface-2);
+      border: 1.5px solid var(--border-2);
+      color: var(--fg);
+      font-family: inherit;
+      font-size: .92rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background .2s, border-color .2s, transform .15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    .btn-google:hover {
+      background: var(--card-solid);
+      border-color: var(--border-2);
+    }
+    .btn-google:active { transform: scale(.97); }
+
+    /* ── Error / Success Messages ── */
+    .auth-msg {
+      padding: 10px 14px;
+      border-radius: var(--r-md);
+      font-size: .85rem;
+      font-weight: 600;
+      margin-bottom: 16px;
+      display: none;
+      align-items: center;
+      gap: 8px;
+      animation: msgIn .2s ease;
+    }
+
+    @keyframes msgIn {
+      from { opacity: 0; transform: translateY(-6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .auth-msg.error   { background: rgba(239,68,68,.12); border: 1px solid rgba(239,68,68,.25); color: #ef4444; display: flex; }
+    .auth-msg.success { background: rgba(16,185,129,.12); border: 1px solid rgba(16,185,129,.25); color: var(--success); display: flex; }
+
+    /* ── Form transition ── */
+    .auth-form { transition: opacity .2s; }
+    .auth-form.hidden { display: none; }
+
+    /* ── Password strength ── */
+    .pwd-strength {
+      margin-top: 6px;
+      display: none;
+    }
+
+    .pwd-strength-bar {
+      height: 3px;
+      border-radius: 99px;
+      background: var(--border);
+      overflow: hidden;
+    }
+
+    .pwd-strength-fill {
+      height: 100%;
+      border-radius: 99px;
+      width: 0%;
+      transition: width .3s, background .3s;
+    }
+
+    .pwd-strength-label {
+      font-size: .72rem;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
+    /* ── Footer link ── */
+    .form-footer {
+      text-align: center;
+      margin-top: 20px;
+      font-size: .82rem;
+      color: var(--muted);
+    }
+
+    .form-footer a {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 700;
+    }
+    .form-footer a:hover { text-decoration: underline; }
+
+    /* ── Theme toggle in corner ── */
+    .login-theme-toggle {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      background: var(--surface-2);
+      border: 1px solid var(--border-2);
+      border-radius: 50%;
+      width: 40px; height: 40px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      z-index: 100;
+      transition: background .2s;
+    }
+    .login-theme-toggle:hover { background: var(--card-solid); }
+
+    /* ── Back to home ── */
+    .back-home {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: var(--surface-2);
+      border: 1px solid var(--border-2);
+      border-radius: 99px;
+      padding: 8px 18px;
+      font-size: .82rem;
+      font-weight: 700;
+      color: var(--fg);
+      text-decoration: none;
+      z-index: 100;
+      transition: background .2s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .back-home:hover { background: var(--card-solid); }
+
+    /* ── Responsive ── */
+    @media (max-width: 768px) {
+      .login-brand { display: none; }
+      .login-form-panel {
+        width: 100%;
+        border: none;
+        padding: 32px 24px;
+      }
+    }
+
+    /* ── Animated background grid ── */
+    .login-grid {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(99,102,241,.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(99,102,241,.04) 1px, transparent 1px);
+      background-size: 48px 48px;
+      animation: gridMove 20s linear infinite;
+      pointer-events: none;
+    }
+
+    @keyframes gridMove {
+      from { background-position: 0 0; }
+      to   { background-position: 48px 48px; }
+    }
+
+    /* ── Login page: z-index & grid fixes ── */
+
+    /* Establish a stacking context for the whole login layout
+       so fixed background elements (neon grid) never bleed through */
+    .login-root {
+      isolation: isolate;
+    }
+
+    /* Ensure the form panel is fully opaque — no grid bleed-through */
+    .login-form-panel {
+      isolation: isolate;
+      /* Solid dark fallback so grid cells never show through in dark mode */
+      background-color: #0e0e24 !important;
+    }
+
+    /* Light mode: white background */
+    [data-theme="light"] .login-form-panel {
+      background-color: #ffffff !important;
+    }
+
+    @media (prefers-color-scheme: light) {
+      [data-theme="auto"] .login-form-panel {
+        background-color: #ffffff !important;
+      }
+    }
+
+    /* On the login page the grid should fade toward the form side (left in RTL).
+       Override the global mask with one biased toward the right (brand) half. */
+    .neon-grid-bg {
+      -webkit-mask-image: radial-gradient(ellipse 60% 90% at 70% 50%, black 0%, transparent 65%);
+      mask-image: radial-gradient(ellipse 60% 90% at 70% 50%, black 0%, transparent 65%);
+    }
+
+    /* In light mode the cyan/purple grid is jarring on white — suppress entirely */
+    [data-theme="light"] .neon-grid-bg,
+    [data-theme="light"] .grid-cell-interactive {
+      display: none;
+    }
+
+    @media (prefers-color-scheme: light) {
+      [data-theme="auto"] .neon-grid-bg,
+      [data-theme="auto"] .grid-cell-interactive {
+        display: none;
+      }
+    }
+
+    /* ── Forgot password form ── */
+    .forgot-note {
+      color: var(--muted);
+      font-size: .85rem;
+      line-height: 1.6;
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+
+<body class="app" data-theme="auto">
+
+  <!-- Back to Home -->
+  <a href="index.html" class="back-home">← الرئيسية</a>
+
+  <!-- Theme Toggle -->
+  <button class="login-theme-toggle" id="themeToggle" aria-label="تغيير المظهر" title="تغيير المظهر">🌓</button>
+
+  <div class="login-root">
+
+    <!-- ── Brand Panel (RIGHT in RTL) ── -->
+    <div class="login-brand">
+      <div class="login-grid"></div>
+      <div class="aurora-blob" style="width:400px;height:400px;top:-100px;right:-100px;background:radial-gradient(circle,rgba(99,102,241,.2) 0%,transparent 70%);position:absolute;"></div>
+      <div class="aurora-blob" style="width:300px;height:300px;bottom:-80px;left:-80px;background:radial-gradient(circle,rgba(6,182,212,.15) 0%,transparent 70%);position:absolute;animation-delay:-3s;"></div>
+
+      <!-- Floating dots -->
+      <div class="float-dot" style="width:4px;height:4px;background:rgba(99,102,241,.5);bottom:20%;right:15%;animation-duration:8s;"></div>
+      <div class="float-dot" style="width:6px;height:6px;background:rgba(6,182,212,.4);bottom:30%;right:40%;animation-duration:11s;animation-delay:-3s;"></div>
+      <div class="float-dot" style="width:3px;height:3px;background:rgba(255,255,255,.3);bottom:60%;right:25%;animation-duration:9s;animation-delay:-1s;"></div>
+
+      <div class="brand-hero">
+        <div class="brand-logo-large">🎓</div>
+
+        <h1 class="brand-title">
+          رفيقك الذكي<br>
+          <span>في مسيرتك الأكاديمية</span>
+        </h1>
+
+        <p class="brand-subtitle">
+          منصة أكاديمية متكاملة مبنية لطلاب جامعة أم القرى —
+          سجّل الدخول للوصول إلى أدواتك المخصصة.
+        </p>
+
+        <div class="brand-features">
+          <div class="brand-feature">
+            <div class="feature-icon">🤖</div>
+            <div>
+              <div class="feature-text">مساعد ذكاء اصطناعي</div>
+              <div class="feature-desc">أجب على أسئلتك الأكاديمية فوراً</div>
+            </div>
+          </div>
+          <div class="brand-feature">
+            <div class="feature-icon">🧮</div>
+            <div>
+              <div class="feature-text">حاسبة المعدل الذكية</div>
+              <div class="feature-desc">تتبع معدلك التراكمي بدقة تامة</div>
+            </div>
+          </div>
+          <div class="brand-feature">
+            <div class="feature-icon">📅</div>
+            <div>
+              <div class="feature-text">خطط مذاكرة مخصصة</div>
+              <div class="feature-desc">جداول تتناسب مع أسلوبك الدراسي</div>
+            </div>
+          </div>
+          <div class="brand-feature">
+            <div class="feature-icon">🔔</div>
+            <div>
+              <div class="feature-text">تنبيهات الاختبارات</div>
+              <div class="feature-desc">لا تنسَ موعد أي اختبار مرة أخرى</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Mini stats -->
+        <div style="display:flex;gap:24px;margin-top:36px;padding-top:24px;border-top:1px solid rgba(255,255,255,.08);">
+          <div>
+            <div style="font-size:1.4rem;font-weight:900;color:var(--accent);">24/7</div>
+            <div style="font-size:.72rem;color:rgba(255,255,255,.45);margin-top:2px;">متاح دائماً</div>
+          </div>
+          <div>
+            <div style="font-size:1.4rem;font-weight:900;color:var(--accent-2);">100%</div>
+            <div style="font-size:.72rem;color:rgba(255,255,255,.45);margin-top:2px;">خصوصية تامة</div>
+          </div>
+          <div>
+            <div style="font-size:1.4rem;font-weight:900;color:#fff;">مجاني</div>
+            <div style="font-size:.72rem;color:rgba(255,255,255,.45);margin-top:2px;">بلا رسوم</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Form Panel (LEFT in RTL) ── -->
+    <div class="login-form-panel">
+
+      <!-- Mobile logo -->
+      <div class="form-header" style="display:block;">
+        <div class="logo-mini">🎓</div>
+        <div class="form-title" id="formTitle">مرحباً بك 👋</div>
+        <div class="form-subtitle" id="formSubtitle">سجّل الدخول للمتابعة إلى حسابك</div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="auth-tabs">
+        <button class="auth-tab active" id="tabLogin" onclick="switchTab('login')">تسجيل الدخول</button>
+        <button class="auth-tab" id="tabRegister" onclick="switchTab('register')">إنشاء حساب</button>
+      </div>
+
+      <!-- Error/Success messages -->
+      <div class="auth-msg" id="authMsg">
+        <span id="authMsgIcon">⚠️</span>
+        <span id="authMsgText"></span>
+      </div>
+
+      <!-- ── LOGIN FORM ── -->
+      <form class="auth-form" id="loginForm" onsubmit="handleLogin(event)" novalidate>
+
+        <div class="form-group">
+          <label for="loginEmail">البريد الإلكتروني</label>
+          <div class="input-wrapper">
+            <input type="email" id="loginEmail" placeholder="example@uqu.edu.sa" autocomplete="email" required />
+            <span class="input-icon">✉️</span>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="loginPassword">كلمة المرور</label>
+          <div class="input-wrapper">
+            <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password" required />
+            <span class="input-icon">🔒</span>
+            <button type="button" class="toggle-password" onclick="togglePwd('loginPassword', this)" title="إظهار/إخفاء">👁</button>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <label class="checkbox-label">
+            <input type="checkbox" id="rememberMe" />
+            تذكرني
+          </label>
+          <a href="#" class="forgot-link" onclick="switchTab('forgot'); return false;">نسيت كلمة المرور؟</a>
+        </div>
+
+        <button type="submit" class="btn-auth" id="btnLogin">
+          <span class="btn-text">تسجيل الدخول</span>
+          <div class="btn-spinner"></div>
+        </button>
+
+        <div class="auth-divider">أو</div>
+
+        <button type="button" class="btn-google" onclick="showGoogleInfo()">
+          <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+            <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>
+            <path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.983 5.482 18 9 18z" fill="#34A853"/>
+            <path d="M3.964 10.71c-.18-.54-.282-1.117-.282-1.71s.102-1.17.282-1.71V4.958H.957C.347 6.173 0 7.548 0 9s.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/>
+            <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0 5.482 0 2.438 2.017.957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
+          </svg>
+          <span>متابعة بحساب Google</span>
+        </button>
+
+        <div class="form-footer">
+          ليس لديك حساب؟
+          <a href="#" onclick="switchTab('register'); return false;">أنشئ حساباً مجانياً</a>
+        </div>
+      </form>
+
+      <!-- ── REGISTER FORM ── -->
+      <form class="auth-form hidden" id="registerForm" onsubmit="handleRegister(event)" novalidate>
+
+        <div class="form-group">
+          <label for="regName">الاسم الكريم</label>
+          <div class="input-wrapper">
+            <input type="text" id="regName" placeholder="محمد عبدالله" autocomplete="name" required />
+            <span class="input-icon">👤</span>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="regEmail">البريد الإلكتروني</label>
+          <div class="input-wrapper">
+            <input type="email" id="regEmail" placeholder="example@uqu.edu.sa" autocomplete="email" required />
+            <span class="input-icon">✉️</span>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="regMajor">التخصص (اختياري)</label>
+          <div class="input-wrapper">
+            <input type="text" id="regMajor" placeholder="علوم الحاسب والمعلومات" />
+            <span class="input-icon">📚</span>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="regPassword">كلمة المرور</label>
+          <div class="input-wrapper">
+            <input type="password" id="regPassword" placeholder="6 أحرف على الأقل" autocomplete="new-password"
+              required oninput="checkPasswordStrength(this.value)" />
+            <span class="input-icon">🔒</span>
+            <button type="button" class="toggle-password" onclick="togglePwd('regPassword', this)" title="إظهار/إخفاء">👁</button>
+          </div>
+          <div class="pwd-strength" id="pwdStrength">
+            <div class="pwd-strength-bar">
+              <div class="pwd-strength-fill" id="pwdFill"></div>
+            </div>
+            <div class="pwd-strength-label" id="pwdLabel"></div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="regPasswordConfirm">تأكيد كلمة المرور</label>
+          <div class="input-wrapper">
+            <input type="password" id="regPasswordConfirm" placeholder="أعد كتابة كلمة المرور" autocomplete="new-password" required />
+            <span class="input-icon">🔐</span>
+            <button type="button" class="toggle-password" onclick="togglePwd('regPasswordConfirm', this)" title="إظهار/إخفاء">👁</button>
+          </div>
+        </div>
+
+        <button type="submit" class="btn-auth" id="btnRegister">
+          <span class="btn-text">✨ إنشاء الحساب</span>
+          <div class="btn-spinner"></div>
+        </button>
+
+        <div class="form-footer">
+          لديك حساب بالفعل؟
+          <a href="#" onclick="switchTab('login'); return false;">سجّل الدخول</a>
+        </div>
+      </form>
+
+      <!-- ── FORGOT PASSWORD ── -->
+      <div class="auth-form hidden" id="forgotForm">
+        <div style="text-align:center;margin-bottom:20px;">
+          <div style="font-size:2.5rem;margin-bottom:12px;">🔑</div>
+        </div>
+        <p class="forgot-note">
+          بما أن هذا التطبيق يعمل محلياً على متصفحك، لا يمكن استرداد كلمة المرور عبر البريد الإلكتروني.
+          يمكنك إنشاء حساب جديد أو التواصل مع مدير النظام.
+        </p>
+
+        <button type="button" class="btn-auth" style="background:var(--surface-2);color:var(--fg);box-shadow:none;border:1.5px solid var(--border-2);" onclick="switchTab('login')">
+          <span class="btn-text">← العودة لتسجيل الدخول</span>
+        </button>
+
+        <div style="margin-top:14px;">
+          <button type="button" class="btn-auth" onclick="switchTab('register')">
+            <span class="btn-text">إنشاء حساب جديد</span>
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script src="assets/firebase-config.js"></script>
+  <!-- Scripts -->
+  <script src="assets/core.js" defer></script>
+  <script src="assets/auth.js"></script>
+  <script src="assets/firebase-auth.js" defer></script>
+  <script src="assets/firebase-db.js" defer></script>
+
+  <script>
+    // ── Redirect if already logged in ──────────────────
+    document.addEventListener('DOMContentLoaded', () => {
+      if (window.UQUAuth?.isLoggedIn()) {
+        window.location.href = 'dashboard.html';
+      }
+    });
+
+    // ── Tab Switcher ───────────────────────────────────
+    function switchTab(tab) {
+      const loginForm    = document.getElementById('loginForm');
+      const registerForm = document.getElementById('registerForm');
+      const forgotForm   = document.getElementById('forgotForm');
+      const tabLogin     = document.getElementById('tabLogin');
+      const tabRegister  = document.getElementById('tabRegister');
+      const title        = document.getElementById('formTitle');
+      const subtitle     = document.getElementById('formSubtitle');
+      const msg          = document.getElementById('authMsg');
+
+      // Hide all
+      [loginForm, registerForm, forgotForm].forEach(f => f?.classList.add('hidden'));
+      [tabLogin, tabRegister].forEach(t => t?.classList.remove('active'));
+      msg.className = 'auth-msg';
+
+      if (tab === 'login') {
+        loginForm?.classList.remove('hidden');
+        tabLogin?.classList.add('active');
+        title.textContent    = 'مرحباً بك 👋';
+        subtitle.textContent = 'سجّل الدخول للمتابعة إلى حسابك';
+      } else if (tab === 'register') {
+        registerForm?.classList.remove('hidden');
+        tabRegister?.classList.add('active');
+        title.textContent    = 'إنشاء حساب جديد ✨';
+        subtitle.textContent = 'انضم وابدأ رحلتك الأكاديمية معنا';
+      } else if (tab === 'forgot') {
+        forgotForm?.classList.remove('hidden');
+        title.textContent    = 'استرداد كلمة المرور 🔑';
+        subtitle.textContent = '';
+      }
+    }
+
+    // ── Show/Hide Password ─────────────────────────────
+    function togglePwd(inputId, btn) {
+      const inp = document.getElementById(inputId);
+      if (!inp) return;
+      const isText = inp.type === 'text';
+      inp.type = isText ? 'password' : 'text';
+      btn.textContent = isText ? '👁' : '🙈';
+    }
+
+    // ── Password Strength ──────────────────────────────
+    function checkPasswordStrength(value) {
+      const container = document.getElementById('pwdStrength');
+      const fill      = document.getElementById('pwdFill');
+      const label     = document.getElementById('pwdLabel');
+      if (!container) return;
+
+      container.style.display = value ? 'block' : 'none';
+      if (!value) return;
+
+      let score = 0;
+      if (value.length >= 6)  score++;
+      if (value.length >= 10) score++;
+      if (/[A-Z]/.test(value) || /[a-z]/.test(value)) score++;
+      if (/[0-9]/.test(value)) score++;
+      if (/[^A-Za-z0-9]/.test(value)) score++;
+
+      const levels = [
+        { w: '20%',  c: '#ef4444', t: 'ضعيفة جداً' },
+        { w: '40%',  c: '#f97316', t: 'ضعيفة' },
+        { w: '60%',  c: '#eab308', t: 'متوسطة' },
+        { w: '80%',  c: '#22c55e', t: 'قوية' },
+        { w: '100%', c: '#10b981', t: 'قوية جداً' },
+      ];
+
+      const lv = levels[Math.min(score, 4)];
+      fill.style.width      = lv.w;
+      fill.style.background = lv.c;
+      label.textContent     = `قوة كلمة المرور: ${lv.t}`;
+      label.style.color     = lv.c;
+    }
+
+    // ── Show Message ───────────────────────────────────
+    function showMsg(text, type = 'error') {
+      const msg  = document.getElementById('authMsg');
+      const icon = document.getElementById('authMsgIcon');
+      const txt  = document.getElementById('authMsgText');
+      msg.className = `auth-msg ${type}`;
+      icon.textContent = type === 'error' ? '⚠️' : '✅';
+      txt.textContent  = text;
+    }
+
+    function clearMsg() {
+      const msg = document.getElementById('authMsg');
+      msg.className = 'auth-msg';
+    }
+
+    // ── Set Loading State ──────────────────────────────
+    function setLoading(btnId, loading) {
+      const btn = document.getElementById(btnId);
+      if (!btn) return;
+      if (loading) {
+        btn.classList.add('loading');
+        btn.disabled = true;
+      } else {
+        btn.classList.remove('loading');
+        btn.disabled = false;
+      }
+    }
+
+    // ── Handle Login ───────────────────────────────────
+    async function handleLogin(e) {
+      e.preventDefault();
+      clearMsg();
+      const email    = document.getElementById('loginEmail')?.value?.trim();
+      const password = document.getElementById('loginPassword')?.value;
+      const remember = document.getElementById('rememberMe')?.checked;
+
+      if (!email || !password) {
+        showMsg('يرجى تعبئة جميع الحقول المطلوبة');
+        return;
+      }
+
+      setLoading('btnLogin', true);
+      try {
+        await window.UQUAuth.login({ email, password, remember });
+        showMsg('تم تسجيل الدخول بنجاح! جارٍ التوجيه…', 'success');
+        setTimeout(() => { window.location.href = 'dashboard.html'; }, 3000);
+      } catch (err) {
+        showMsg(err.message || 'حدث خطأ غير متوقع');
+        setLoading('btnLogin', false);
+      }
+    }
+
+    // ── Handle Register ────────────────────────────────
+    async function handleRegister(e) {
+      e.preventDefault();
+      clearMsg();
+      const name      = document.getElementById('regName')?.value?.trim();
+      const email     = document.getElementById('regEmail')?.value?.trim();
+      const major     = document.getElementById('regMajor')?.value?.trim();
+      const password  = document.getElementById('regPassword')?.value;
+      const password2 = document.getElementById('regPasswordConfirm')?.value;
+
+      if (!name || !email || !password) {
+        showMsg('يرجى تعبئة جميع الحقول المطلوبة');
+        return;
+      }
+      if (password !== password2) {
+        showMsg('كلمة المرور وتأكيدها غير متطابقتين');
+        return;
+      }
+      if (password.length < 6) {
+        showMsg('كلمة المرور يجب أن تكون 6 أحرف على الأقل');
+        return;
+      }
+
+      setLoading('btnRegister', true);
+      try {
+        await window.UQUAuth.register({ name, email, password, major });
+        showMsg('تم إنشاء الحساب بنجاح! 🎉 جارٍ التوجيه…', 'success');
+        setTimeout(() => { window.location.href = 'profile.html'; }, 3000);
+      } catch (err) {
+        showMsg(err.message || 'حدث خطأ غير متوقع');
+        setLoading('btnRegister', false);
+      }
+    }
+
+    // ── Google Button Info ─────────────────────────────
+    function showGoogleInfo() {
+      showMsg('تسجيل الدخول بـ Google سيكون متاحاً قريباً. استخدم البريد الإلكتروني الآن.', 'error');
+    }
+
+    // ── Theme Toggle ───────────────────────────────────
+    document.getElementById('themeToggle')?.addEventListener('click', () => {
+      const body = document.body;
+      const themes = ['auto', 'dark', 'light'];
+      const current = body.getAttribute('data-theme') || 'auto';
+      const next = themes[(themes.indexOf(current) + 1) % themes.length];
+      body.setAttribute('data-theme', next);
+      localStorage.setItem('uqu_theme', next);
+    });
+
+    // ── Apply saved theme ──────────────────────────────
+    (() => {
+      const saved = localStorage.getItem('uqu_theme') || 'auto';
+      document.body.setAttribute('data-theme', saved);
+    })();
+  </script>
+
+  <!-- Neon Grid Background -->
+  <script src="assets/neon-grid.js" defer></script>
+</body>
+</html>
