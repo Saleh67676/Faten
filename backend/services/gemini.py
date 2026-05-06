@@ -25,6 +25,93 @@ logger = logging.getLogger(__name__)
 GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 
 
+async def call_gemini_chat_text(
+    messages: list[dict],
+    system_prompt: str,
+    temperature: float = 0.7,
+    timeout_seconds: float = 45.0,
+) -> str | None:
+    """
+    Plain-text Gemini chat call (multi-turn).
+    Used as fallback when the primary OpenAI model deflects or fails.
+
+    Args:
+        messages: List of {role, content} — same shape as OpenAI messages.
+                  Roles must be 'user' or 'assistant'.
+        system_prompt: System instruction (injected as systemInstruction).
+        temperature: Generation temperature (default 0.7).
+        timeout_seconds: Request timeout.
+
+    Returns:
+        The model's plain-text reply, or None if the call fails.
+    """
+    settings = get_settings()
+    if not settings.GEMINI_API_KEY:
+        logger.warning("[Gemini fallback] GEMINI_API_KEY not set — skipping")
+        return None
+
+    # Convert OpenAI-style messages → Gemini contents array
+    contents: list[dict] = []
+    for m in messages:
+        role = m.get("role", "user")
+        if role == "system":
+            continue  # system handled via systemInstruction
+        gemini_role = "model" if role == "assistant" else "user"
+        text = m.get("content", "")
+        if not text:
+            continue
+        # Merge consecutive same-role turns (Gemini requires alternating)
+        if contents and contents[-1]["role"] == gemini_role:
+            contents[-1]["parts"][0]["text"] += "\n" + text
+        else:
+            contents.append({"role": gemini_role, "parts": [{"text": text}]})
+
+    if not contents:
+        return None
+
+    url = (
+        f"{GEMINI_BASE}/{settings.GEMINI_MODEL}:generateContent"
+        f"?key={settings.GEMINI_API_KEY}"
+    )
+    payload = {
+        "contents": contents,
+        "systemInstruction": {"parts": [{"text": system_prompt}]},
+        "generationConfig": {"temperature": temperature},
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=timeout_seconds) as client:
+            resp = await client.post(
+                url,
+                headers={"Content-Type": "application/json"},
+                json=payload,
+            )
+    except httpx.RequestError as exc:
+        logger.error("[Gemini fallback] Request error: %s", exc)
+        return None
+
+    if resp.status_code != 200:
+        logger.error(
+            "[Gemini fallback] HTTP %s — body=%s",
+            resp.status_code,
+            resp.text[:300],
+        )
+        return None
+
+    try:
+        data = resp.json()
+        parts = (
+            data.get("candidates", [{}])[0]
+            .get("content", {})
+            .get("parts", [])
+        )
+        text = "".join(p.get("text", "") for p in parts).strip()
+        return text or None
+    except Exception as exc:
+        logger.error("[Gemini fallback] Parse error: %s", exc)
+        return None
+
+
 def _clean_json_text(text: str) -> str:
     """Robust JSON extraction:
     1. Strip leading/trailing whitespace

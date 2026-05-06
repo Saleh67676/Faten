@@ -253,10 +253,17 @@
       return { role: m.role, content: contentStr };
     });
 
-    console.log('[AI] → POST /api/chat | msgs:', cleanedMessages.length);
+    // Trim to last 8 messages before sending to prevent context overflow.
+    // The backend also trims, but doing it here reduces payload size.
+    const MAX_SEND = 8;
+    const trimmedMessages = cleanedMessages.length > MAX_SEND
+      ? cleanedMessages.slice(-MAX_SEND)
+      : cleanedMessages;
+
+    console.log('[AI] → POST /api/chat | msgs:', trimmedMessages.length, '(of', cleanedMessages.length, ')');
 
     try {
-      const data = await api.post('/api/chat', { messages: cleanedMessages, conversationId: null });
+      const data = await api.post('/api/chat', { messages: trimmedMessages, conversationId: null });
       if (!data.success) throw new Error(data.message || 'فشل الاتصال بالمحرك الذكي');
 
       const serverActions = data.actions || [];

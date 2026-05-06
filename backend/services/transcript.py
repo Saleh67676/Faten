@@ -1,4 +1,4 @@
-﻿"""
+"""
 ================================================================
 UQU Academic Transcript Parser — Smart Logic Edition (Python)
 ================================================================
@@ -22,9 +22,9 @@ logger = logging.getLogger(__name__)
 # Patterns
 COURSE_CODE_RE = re.compile(r'^([A-Z]{2,5})\s*(\d{3,4}[A-Z]?)$')
 GRADE_MAP = {
-    'A+': 5.00, 'A': 4.75, 'B+': 4.50, 'B': 4.00,
-    'C+': 3.50, 'C': 3.00, 'D+': 2.50, 'D': 2.00,
-    'F': 1.00, 'DN': 0.00, 'W': None, 'IP': None, 'IC': None, 'NP': None,
+    'A+': 4.00, 'A': 4.00, 'B+': 3.33, 'B': 3.00,
+    'C+': 2.33, 'C': 2.00, 'D+': 1.33, 'D': 1.00,
+    'F': 0.00, 'DN': 0.00, 'W': None, 'IP': None, 'IC': None, 'NP': None,
 }
 
 SEM_RE = re.compile(r'(First|Second|Third|Summer)\s+Semester\s+(\d{4}[/\-]\d{4})', re.I)

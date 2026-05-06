@@ -4,50 +4,30 @@ UQU Academic Assistant — Authentication Dependencies
 ================================================================
 Firebase ID Token verification as a FastAPI dependency.
 Handles both authenticated users and initial signup scenarios.
+
+Token verification logic lives in auth/bearer.py (_decode_firebase_token).
+This module provides the Header-based dependency variants.
 """
 
-from fastapi import Header, HTTPException
-from firebase_admin import auth
 import logging
+from fastapi import Header, HTTPException
+
+from auth.bearer import _decode_firebase_token
 
 logger = logging.getLogger(__name__)
 
 
 async def get_current_user(authorization: str = Header(default="")) -> str:
-    """Verify Firebase ID token from Authorization header.
+    """Verify Firebase ID token from Authorization: Bearer <token> header.
 
-    Usage in routers:
-        @router.post("/endpoint")
-        async def endpoint(user_id: str = Depends(get_current_user)):
-            ...
+    Returns Firebase UID. Raises HTTP 401 on any failure.
     """
     if not authorization.startswith("Bearer "):
         raise HTTPException(
             status_code=401,
-            detail="مطلوب تسجيل الدخول — Authorization header مفقود"
+            detail="مطلوب تسجيل الدخول — Authorization header مفقود",
         )
-
-    token = authorization[7:]  # Remove "Bearer " prefix
-
-    try:
-        decoded = auth.verify_id_token(token)
-        return decoded["uid"]
-    except auth.ExpiredIdTokenError:
-        raise HTTPException(
-            status_code=401,
-            detail="انتهت صلاحية رمز المصادقة — أعد تسجيل الدخول"
-        )
-    except auth.InvalidIdTokenError:
-        raise HTTPException(
-            status_code=401,
-            detail="رمز المصادقة غير صالح"
-        )
-    except Exception as e:
-        logger.warning(f"Auth verification failed: {e}")
-        raise HTTPException(
-            status_code=401,
-            detail="فشل التحقق من المصادقة"
-        )
+    return _decode_firebase_token(authorization[7:])
 
 
 async def get_current_user_optional(authorization: str = Header(default="")) -> str:

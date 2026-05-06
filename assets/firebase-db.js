@@ -269,15 +269,17 @@
         targetGpa:   profile.goals?.targetGpa   ?? null,
         earnedHours: profile.goals?.earnedHours ?? null,
         planHours:   profile.goals?.planHours   ?? null,
+        termPlanHours: profile.goals?.termPlanHours ?? null,
+        goal:        profile.goals?.priority    || profile.goals?.goal || 'raise',
         courses:     profile.courses || []
       },
       study_preferences: {
-        best_time:    profile.learning?.bestTime    || '',
-        study_hours:  profile.learning?.studyHours  || 0,
-        method:       profile.learning?.studyStyle  || '',
-        focus_length: profile.learning?.focusLength || 25,
-        study_speed:  profile.learning?.studySpeed  || 'normal',
-        stress_level: profile.learning?.stressLevel || 'normal'
+        best_time:    profile.learning?.preferredTime || profile.learning?.bestTime    || '',
+        study_hours:  profile.learning?.studyHours    || 0,
+        method:       profile.learning?.style         || profile.learning?.studyStyle  || '',
+        focus_length: profile.learning?.focusMinutes  || profile.learning?.focusLength || 25,
+        study_speed:  profile.learning?.speed         || profile.learning?.studySpeed  || 'normal',
+        stress_level: profile.learning?.stressLevel   || 'normal'
       },
       updatedAt: new Date().toISOString()
     }, { merge: true });
@@ -291,7 +293,7 @@
 
     try {
       // Try FastAPI backend first; falls back to direct Firestore write.
-      const ok = await window.UQUCore.api.tryPost('/syncProfile', profile);
+      const ok = await window.UQUCore.api.tryPost('/api/sync-profile', profile);
       if (ok) return;
       await _pushProfileDirect(profile);
     } catch (err) {

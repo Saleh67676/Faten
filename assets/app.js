@@ -393,15 +393,15 @@ class GPAController {
           } else {
             // سلم بديل بسيط
             const s = Number(score) || 0;
-            if (s >= 95) gradeValue = 5.0;
-            else if (s >= 90) gradeValue = 4.75;
-            else if (s >= 85) gradeValue = 4.5;
-            else if (s >= 80) gradeValue = 4.0;
-            else if (s >= 75) gradeValue = 3.5;
-            else if (s >= 70) gradeValue = 3.0;
-            else if (s >= 65) gradeValue = 2.5;
+            if (s >= 95) gradeValue = 4.0;
+            else if (s >= 90) gradeValue = 4.0;
+            else if (s >= 85) gradeValue = 3.67;
+            else if (s >= 80) gradeValue = 3.33;
+            else if (s >= 75) gradeValue = 3.0;
+            else if (s >= 70) gradeValue = 2.67;
+            else if (s >= 65) gradeValue = 2.33;
             else if (s >= 60) gradeValue = 2.0;
-            else gradeValue = 1.0; // أو 0 لو تحب F = 0
+            else gradeValue = 1.0;
           }
         } else {
           // لا درجة من 100 ولا حفظ → نخليها F كبداية (الطالب يغيّرها)
@@ -516,15 +516,18 @@ class GPAController {
       'display:grid; grid-template-columns: 2fr 1fr 1fr auto; gap:10px; align-items:center; padding:10px; background:var(--surface); border:1px solid var(--border); border-radius:12px; box-shadow:var(--shadow-sm); margin-bottom:8px;';
 
     const grades = [
-      { L: 'A+', V: 5 },
-      { L: 'A', V: 4.75 },
-      { L: 'B+', V: 4.5 },
-      { L: 'B', V: 4.0 },
-      { L: 'C+', V: 3.5 },
-      { L: 'C', V: 3.0 },
-      { L: 'D+', V: 2.5 },
-      { L: 'D', V: 2.0 },
-      { L: 'F', V: 1.0 }
+      { L: 'A+', V: 4 },
+      { L: 'A', V: 4 },
+      { L: 'A-', V: 3.67 },
+      { L: 'B+', V: 3.33 },
+      { L: 'B', V: 3.0 },
+      { L: 'B-', V: 2.67 },
+      { L: 'C+', V: 2.33 },
+      { L: 'C', V: 2.0 },
+      { L: 'C-', V: 1.67 },
+      { L: 'D+', V: 1.33 },
+      { L: 'D', V: 1.0 },
+      { L: 'F', V: 0 }
     ];
 
     row.innerHTML = `
@@ -764,7 +767,7 @@ class DashboardController {
 
     // Main Stats
     const curGpa = document.getElementById('dashCurrentGpa');
-    if (curGpa) curGpa.textContent = p.currentGpa ? p.currentGpa.toFixed(2) : '0.00';
+    if (curGpa) curGpa.textContent = p.currentGpa ? p.currentGpa.toFixed(2) : '—';
 
     const targetGpa = document.getElementById('dashExpectedGpa');
     if (targetGpa) targetGpa.textContent = p.targetGpa ? p.targetGpa.toFixed(2) : '—';
@@ -1022,7 +1025,8 @@ function initPlanPage() {
         difficulty: c.difficulty,
         currentProgress: c.currentProgress || 0,
         progressPerSession: calculateProgressPerSession(c.difficulty, speed),
-        weeklyHours: 0
+        weeklyHours: 0,
+        schedule_slots: c.schedule_slots || []
       }));
 
       const slotsFromProfile =
@@ -1539,32 +1543,13 @@ if (els.taskDay && els.taskDeadlineDate) {
       if (!state.sessionMin || state.sessionMin < 20) return alert('مدة الجلسة قصيرة جداً.');
 
       try {
-        let token = null;
-        try {
-          if (window.firebase?.auth) {
-            const u = window.firebase.auth().currentUser;
-            if (u) token = await u.getIdToken();
-          }
-          if (!token && window.FirebaseAuth?.getIdToken) token = await window.FirebaseAuth.getIdToken();
-          if (!token && window.FirebaseDB?.getIdToken) token = await window.FirebaseDB.getIdToken();
-        } catch (_) { /* proceed without token */ }
-        const res = await fetch(`${window.AGENT_BASE_URL || 'http://localhost:8000'}/api/plan/generate-fallback`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-          },
-          body: JSON.stringify({
-            slots: state.slots,
-            courses: state.courses,
-            sessionMin: state.sessionMin,
-            weeks: state.weeks || 1,
-            planStart: formatISODate(getPlanStartDateObj())
-          })
+        const data = await window.UQUCore.api.post('/api/plan/generate-fallback', {
+          slots: state.slots,
+          courses: state.courses,
+          sessionMin: state.sessionMin,
+          weeks: state.weeks || 1,
+          planStart: formatISODate(getPlanStartDateObj())
         });
-        
-        if (!res.ok) throw new Error('فشل التوليد من الخادم');
-        const data = await res.json();
         
         if (data.success && data.plan) {
           const manualTasks = state.tasks || [];
@@ -1619,22 +1604,22 @@ if (els.taskDay && els.taskDeadlineDate) {
         const manualTasks = state.tasks || [];
         const studyTasks = [];
 
-        // Build study tasks from AI output
-        (aiOutput.tasks || []).forEach((t, i) => {
-           // match course
+        // Build study tasks from AI output (supports multi-week)
+        (aiOutput.tasks || []).forEach((t) => {
            const matchCourse = state.courses.find(c => c.name.includes(t.courseName) || t.courseName.includes(c.name));
-           
+           const weekNum = (typeof t.week === 'number' && t.week >= 1) ? t.week : 1;
+
            studyTasks.push({
              id: uuid(),
              kind: 'study',
-             week: 1, // Focus on week 1 for now
+             week: weekNum,
              day: t.day,
-             date: getDateForWeekAndDay(0, t.day) || new Date().toISOString(), // 0 for week 1
+             date: t.date || getDateForWeekAndDay(weekNum - 1, t.day) || new Date().toISOString(),
              time: t.time,
              timeEnd: t.timeEnd || t.time,
-             courseId: matchCourse ? matchCourse.id : null,
+             courseId: (matchCourse ? matchCourse.id : null) || t.courseId || null,
              courseName: matchCourse ? matchCourse.name : t.courseName,
-             courseColor: matchCourse ? matchCourse.color : '#6366f1',
+             courseColor: (matchCourse ? matchCourse.color : null) || t.courseColor || '#6366f1',
              title: t.title,
              place: t.place || '—',
              note: t.note || ''
@@ -1642,8 +1627,10 @@ if (els.taskDay && els.taskDeadlineDate) {
         });
 
         state.plan = studyTasks.concat(manualTasks);
+        // Compute the total week count from the generated tasks
+        const weekNums = studyTasks.map(t => t.week).filter(Boolean);
+        state.weeks = weekNums.length > 0 ? Math.max(...weekNums) : (state.weeks || 1);
         state.currentWeekView = 1;
-        state.weeks = 1; // Since AI currently schedules one smart week
 
         storage.set('uqu_plan_v5', state);
         renderWeekNav();
@@ -1652,7 +1639,7 @@ if (els.taskDay && els.taskDeadlineDate) {
 
       } catch(err) {
         console.error('AI Plan Error:', err);
-        alert('عذراً، لم نستطع الاتصال بالعقل الذكي، سنولد خطة مبدئية حتى يعود المحرك.');
+        alert('تعذّر توليد الخطة الذكية، سيتم إنشاء خطة بديلة.');
         fallbackGeneratePlan();
       } finally {
         if (genBtn) {
@@ -3529,6 +3516,12 @@ function initProfileWizard() {
     // حفظ في localStorage
     const _s = window.UQUCore?.S ?? { set(k,v){ try{localStorage.setItem(k,JSON.stringify(v));}catch{} } };
     _s.set('uqu_profile_v2', profileData);
+
+    // 🔥 Push to Firestore immediately after saving locally
+    if (window.FirebaseDB && window.FirebaseDB.isReady()) {
+      window.FirebaseDB.pushProfileToFirestore();
+      console.log('[saveProfileAndFinish] 🔥 Pushed profile to Firestore');
+    }
 
     // إنشاء بلان مبدئي مبني على هذا البروفايل
     initSmartPlan(profileData);

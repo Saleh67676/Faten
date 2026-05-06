@@ -200,7 +200,7 @@
                   <circle cx="60" cy="60" r="50" fill="none" stroke="var(--border-2)" stroke-width="10"/>
                   <circle id="gpaRingFill" cx="60" cy="60" r="50" fill="none" stroke="var(--accent)" stroke-width="10" stroke-dasharray="314" stroke-dashoffset="314" stroke-linecap="round" style="transition:stroke-dashoffset 1.2s ease;filter:drop-shadow(0 0 8px rgba(99,102,241,.4));"/>
                 </svg>
-                <div class="gpa-ring-center"><div class="gpa-ring-num" id="gpaRingNum">—</div><div class="gpa-ring-label">من 5.00</div></div>
+                <div class="gpa-ring-center"><div class="gpa-ring-num" id="gpaRingNum">—</div><div class="gpa-ring-label">من 4.00</div></div>
               </div>
               <div style="flex:1;">
                 <div style="margin-bottom:14px;">
@@ -497,7 +497,7 @@
                   <input type="text" id="pMajor" class="locked-input" value="—" readonly disabled />
                 </div>
                 <div class="input-group">
-                  <label class="lbl" for="pGpaNow">المعدل الحالي (من 5)</label>
+                  <label class="lbl" for="pGpaNow">المعدل الحالي (من 4)</label>
                   <input type="number" id="pGpaNow" class="locked-input" value="0.00" readonly disabled />
                 </div>
                 <div class="input-group">
@@ -835,18 +835,25 @@
     document.getElementById('profileGoalChip').textContent = '🎯 هدف: ' + goalLabel(a?.goal);
     document.getElementById('profileStreakChip').textContent = '🔥 ' + (u?.stats?.streak || 1) + ' يوم';
 
-    document.getElementById('statGpa').textContent = a?.gpaNow ? Number(a.gpaNow).toFixed(2) : '—';
-    document.getElementById('statGpaTarget').textContent = a?.gpaTarget ? Number(a.gpaTarget).toFixed(2) : '—';
+    const GPA_SCALE = 4.0;
+    const rawGpa = parseFloat(a?.gpaNow) || 0;
+    const rawTarget = parseFloat(a?.gpaTarget) || GPA_SCALE;
+    
+    const safeGpa = Math.min(Math.max(rawGpa, 0), GPA_SCALE);
+    const safeTarget = Math.min(Math.max(rawTarget, 0), GPA_SCALE);
+
+    document.getElementById('statGpa').textContent = rawGpa ? safeGpa.toFixed(2) : '—';
+    document.getElementById('statGpaTarget').textContent = rawTarget ? safeTarget.toFixed(2) : '—';
     document.getElementById('statCourses').textContent = c.length;
     document.getElementById('statHours').textContent = a?.earnedHours || '—';
 
-    const gpa = parseFloat(a?.gpaNow) || 0;
-    const target = parseFloat(a?.gpaTarget) || 5;
-    const pct = Math.min((gpa / 5) * 100, 100);
-    const prog = gpa && target ? Math.min((gpa / target) * 100, 100) : 0;
-    document.getElementById('gpaRingNum').textContent = gpa ? gpa.toFixed(2) : '—';
-    document.getElementById('gpaProgressPct').textContent = gpa ? Math.round(prog) + '%' : '—%';
+    const pct = Math.min((safeGpa / GPA_SCALE) * 100, 100);
+    const prog = safeGpa && safeTarget ? Math.min((safeGpa / safeTarget) * 100, 100) : 0;
+    
+    document.getElementById('gpaRingNum').textContent = rawGpa ? safeGpa.toFixed(2) : '—';
+    document.getElementById('gpaProgressPct').textContent = rawGpa ? Math.round(prog) + '%' : '—%';
     document.getElementById('gpaProgressBar').style.width = prog + '%';
+
 
     const earned = parseInt(a?.earnedHours) || 0;
     const plan = parseInt(a?.planHours) || 130;
@@ -975,6 +982,8 @@
       if (!name) { window.UQUCore?.toast('الاسم مطلوب', 'error'); return; }
       window.UQUAuth?.updateProfile({ name: name, major: major, university: university });
       saveProfile({ name: name, major: major, university: university });
+      // 🔥 Push to Firestore
+      if (window.FirebaseDB && window.FirebaseDB.isReady()) window.FirebaseDB.pushProfileToFirestore();
       document.getElementById('editModal').style.display = 'none';
       window.UQUCore?.toast('تم تحديث الملف الشخصي ✓', 'success');
       initProfilePage();
@@ -988,6 +997,8 @@
         planHours:   document.getElementById('editPlanHours')?.value || null,
         goal:        document.getElementById('editGoal')?.value || 'raise',
       });
+      // 🔥 Push to Firestore
+      if (window.FirebaseDB && window.FirebaseDB.isReady()) window.FirebaseDB.pushProfileToFirestore();
       document.getElementById('editModal').style.display = 'none';
       window.UQUCore?.toast('تم حفظ البيانات ✓', 'success');
       initProfilePage();
@@ -1230,7 +1241,7 @@
       }
       
       // GPA Scale Detection
-      var gpaScale = 5.0;
+      var gpaScale = 4.0;
       var uniStr = d.university || '';
       if (uniStr.includes('أم القرى') || uniStr.includes('الملك فهد')) {
          gpaScale = 4.0;
@@ -1401,7 +1412,7 @@
       var targetGpa = parseFloat(targetInput?.value) || 0;
       var termHrs = parseFloat(document.getElementById('pTermPlanHours')?.value) || 0;
       
-      var scale = window.APP_GPA_SCALE || 5.0;
+      var scale = window.APP_GPA_SCALE || 4.0;
 
       if (!maxGpaHint || !targetInput) return;
       

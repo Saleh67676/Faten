@@ -11,32 +11,24 @@
 (function (window) {
   'use strict';
 
-  function _getBackendBase() {
-    return window.AGENT_BASE_URL || 'http://localhost:8000';
-  }
-
-  async function _getIdToken() {
-    try { if (window.firebase?.auth) { const u = window.firebase.auth().currentUser; if (u) return await u.getIdToken(); } } catch (_) { }
-    if (window.FirebaseAuth?.getIdToken) { try { return await window.FirebaseAuth.getIdToken(); } catch (_) { } }
-    return null;
-  }
-
   async function _apiCall(path, method, body) {
-    const token = await _getIdToken();
+    // Guard: skip silently if the user is not authenticated yet.
+    const token = await window.UQUCore.api.getToken();
     if (!token) {
       const err = new Error('NOT_AUTHENTICATED');
       err.silent = true;
       throw err;
     }
-    const headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token };
-    const resp = await fetch(_getBackendBase() + path, { method, headers, body: body ? JSON.stringify(body) : undefined });
-    if (resp.status === 401) {
-      const err = new Error('UNAUTHORIZED');
-      err.silent = true;
+    try {
+      if (method === 'GET') return await window.UQUCore.api.get(path);
+      return await window.UQUCore.api.post(path, body);
+    } catch (err) {
+      // Preserve the original silent-fail contract: a 401 from the backend
+      // means the token expired between the check above and the actual request.
+      // Mark it silent so _logIfNotSilent() swallows it without console noise.
+      if (err.status === 401) err.silent = true;
       throw err;
     }
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    return await resp.json();
   }
 
   function _logIfNotSilent(err) {

@@ -80,7 +80,7 @@
         const formData = new FormData();
         formData.append('file', transcriptFile);
 
-        const res = await fetch(`${window.AGENT_BASE_URL || 'http://localhost:8000'}/api/onboarding/analyze-transcript`, {
+        const res = await fetch(`${window.UQUCore.api.baseUrl()}/api/onboarding/analyze-transcript`, {
           method: 'POST',
           headers,
           body: formData
@@ -99,7 +99,7 @@
              const tbForm = new FormData();
              tbForm.append('file', tbFile);
              
-             const tbRes = await fetch(`${window.AGENT_BASE_URL || 'http://localhost:8000'}/api/onboarding/analyze-timetable`, {
+             const tbRes = await fetch(`${window.UQUCore.api.baseUrl()}/api/onboarding/analyze-timetable`, {
                 method: 'POST',
                 headers,
                 body: tbForm
@@ -154,13 +154,13 @@
     const planInput = document.getElementById('obPlanHoursInput');
     const targetInput = document.getElementById('obTargetGpaInput');
     const errorHint = document.getElementById('obTargetError');
-    let computedMaxGpa = 5.0;
+    let computedMaxGpa = 4.0;
     
     function recalcMaxGpa() {
         if (!extractedData) return;
         let earned = parseFloat(extractedData.earned_hours) || 0;
         let gpa = parseFloat(extractedData.current_gpa) || 0;
-        let scale = parseFloat(extractedData.gpa_scale) || 5.0;
+        let scale = parseFloat(extractedData.gpa_scale) || 4.0;
         let plan = parseFloat(planInput.value) || 130;
         
         if (plan <= earned) {
@@ -238,7 +238,7 @@
   
       try {
         let plan = parseFloat(planInput.value) || 130;
-        let target = parseFloat(targetInput.value) || 5.0;
+        let target = parseFloat(targetInput.value) || 4.0;
         let workStatus = document.getElementById('obWorkStatus')?.value || 'none';
         
         const updates = {
@@ -280,26 +280,17 @@
            : (window.FirebaseDB?.getIdToken ? await window.FirebaseDB.getIdToken() : null);
 
         if (token) {
-           const baseUrl = window.AGENT_BASE_URL || 'http://localhost:8000';
-           const saveRes = await fetch(`${baseUrl}/api/onboarding/save-profile`, {
-             method: 'POST',
-             headers: {
-               'Content-Type': 'application/json',
-               'Authorization': `Bearer ${token}`
-             },
-             body: JSON.stringify({
+           try {
+             await window.UQUCore.api.post('/api/onboarding/save-profile', {
                goals: updates.goals,
                courses: updates.courses,
                preferences: updates.preferences,
                timetable: timetableData ? timetableData.schedule : [],
                historical_semesters: extractedData.historical_semesters || [],
                university: extractedData.university || 'أم القرى'
-             })
-           });
-
-           if (!saveRes.ok) {
-             const errData = await saveRes.json().catch(() => ({}));
-             console.warn('[Onboarding] Backend save warning:', errData.detail || saveRes.status);
+             });
+           } catch (saveErr) {
+             console.warn('[Onboarding] Backend save warning:', saveErr.message);
              // Don't block the UI — localStorage is already saved as fallback
            }
         } else {

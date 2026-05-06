@@ -2,19 +2,36 @@
 ================================================================
 UQU Academic Assistant — Plan Generator Schemas
 ================================================================
-1:1 port of the request/response shape used by
-assets/plan-generator.js (window.GeneratorEngine.generateAIPlan).
-Field names match the JS exactly so the existing UI is not broken.
 """
 
 from typing import Any
 from pydantic import BaseModel, Field
 
 
+class CourseScheduleSlot(BaseModel):
+    """A single lecture time block from the university timetable."""
+    day: str
+    startTime: str = ""
+    endTime: str = ""
+    time: str = ""
+    timeEnd: str = ""
+    activityType: str | None = None
+    room: str | None = None
+    building: str | None = None
+
+    model_config = {"extra": "allow"}
+
+
 class PlanCourse(BaseModel):
     """A current course the student wants scheduled."""
     name: str
     difficulty: str | None = None
+    id: str | None = None
+    examDate: str | None = None
+    currentProgress: float | None = None
+    progressPerSession: float | None = None
+    color: str | None = None
+    schedule_slots: list[dict] = Field(default_factory=list)
 
     model_config = {"extra": "allow"}
 
@@ -62,15 +79,18 @@ class PlanProfile(BaseModel):
 
 
 class PlanGenerationRequest(BaseModel):
-    """Mirror of the `state` argument plus the localStorage data
-    that assets/plan-generator.js reads inline."""
+    """Full state sent from the plan page."""
     courses: list[PlanCourse] = Field(default_factory=list)
     slots: list[PlanSlot] = Field(default_factory=list)
     profile: PlanProfile | None = None
     completedCourses: list[CompletedCourse] = Field(default_factory=list)
+    sessionMin: int = 60
+    weeks: int = 1
+    planStart: str = ""
 
 
 class PlanTask(BaseModel):
+    """A single study session returned to the frontend."""
     day: str
     time: str
     timeEnd: str
@@ -78,14 +98,19 @@ class PlanTask(BaseModel):
     title: str
     note: str
     place: str
+    week: int = 1
+    date: str = ""
+    courseId: str | None = None
+    courseColor: str = "#6366f1"
 
     model_config = {"extra": "allow"}
 
 
 class PlanGenerationResponse(BaseModel):
-    """Exact shape returned by the original JS generateAIPlan(state)."""
+    """Shape returned by generateAIPlan(state) callers."""
     reasoning: str
     tasks: list[PlanTask]
+
 
 class FallbackPlanRequest(BaseModel):
     slots: list[dict[str, Any]]
@@ -93,6 +118,7 @@ class FallbackPlanRequest(BaseModel):
     sessionMin: int = 60
     weeks: int = 1
     planStart: str
+
 
 class FallbackPlanResponse(BaseModel):
     success: bool

@@ -249,7 +249,7 @@ TOOLS_SCHEMA: list[dict] = [
                 "properties": {
                     "target_gpa": {
                         "type": "number",
-                        "description": "المعدل المستهدف من 5.00 (اختياري — يؤخذ من هدف الطالب المحفوظ إذا لم يُحدد)"
+                        "description": "المعدل المستهدف من 4.00 (اختياري — يؤخذ من هدف الطالب المحفوظ إذا لم يُحدد)"
                     },
                     "scenario": {
                         "type": "string",
@@ -388,7 +388,7 @@ TOOLS_SCHEMA: list[dict] = [
                 "type": "object",
                 "properties": {
                     "name":  {"type": "string", "description": "اسم الفصل (مثل: الفصل الأول 1446)"},
-                    "gpa":   {"type": "number", "description": "المعدل التراكمي للفصل (من 5.00)"},
+                    "gpa":   {"type": "number", "description": "المعدل التراكمي للفصل (من 4.00)"},
                     "hours": {"type": "number", "description": "الساعات المعتمدة في هذا الفصل (اختياري)"}
                 },
                 "required": ["name", "gpa"]
@@ -406,7 +406,7 @@ TOOLS_SCHEMA: list[dict] = [
                 "type": "object",
                 "properties": {
                     "course_name": {"type": "string", "description": "اسم المادة"},
-                    "grade":       {"type": "number", "description": "الدرجة الجديدة (من 5.00 على مقياس النقاط)"}
+                    "grade":       {"type": "number", "description": "الدرجة الجديدة (من 4.00 على مقياس النقاط)"}
                 },
                 "required": ["course_name", "grade"]
             }

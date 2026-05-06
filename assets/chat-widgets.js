@@ -14,6 +14,9 @@
 (function (window) {
   'use strict';
 
+  /* ── GPA Scale constant — university uses 4.0 scale ── */
+  const GPA_SCALE = 4.0;
+
   /* ════════════════════════════════════════════════════════════════
      LOCATION DATABASE — UQU buildings + study spots
      ════════════════════════════════════════════════════════════════ */
@@ -204,11 +207,13 @@
      ════════════════════════════════════════════════════════════════ */
 
   function renderGpaCard(profile) {
-    const gpa    = parseFloat(profile?.goals?.currentGpa || profile?.currentGpa || 0);
-    const target = parseFloat(profile?.goals?.targetGpa  || profile?.targetGpa  || 5);
-    const pct    = Math.min(100, (gpa / 5) * 100);
-    const color  = gpa >= 4 ? 'var(--success)' : gpa >= 3 ? 'var(--accent)' : gpa >= 2 ? 'var(--warning)' : 'var(--danger)';
-    const label  = gpa >= 4.5 ? 'ممتاز' : gpa >= 3.75 ? 'جيد جداً' : gpa >= 3 ? 'جيد' : gpa >= 2 ? 'مقبول' : 'ضعيف';
+    const rawGpa    = parseFloat(profile?.goals?.currentGpa || profile?.currentGpa || 0);
+    const rawTarget = parseFloat(profile?.goals?.targetGpa  || profile?.targetGpa  || GPA_SCALE);
+    const gpa       = Math.min(Math.max(rawGpa, 0), GPA_SCALE);
+    const target    = Math.min(Math.max(rawTarget, 0), GPA_SCALE);
+    const pct       = target > 0 ? Math.min(100, (gpa / target) * 100) : 0;
+    const color     = gpa >= 3.7 ? 'var(--success)' : gpa >= 2.7 ? 'var(--accent)' : gpa >= 2 ? 'var(--warning)' : 'var(--danger)';
+    const label     = gpa >= 3.85 ? 'ممتاز' : gpa >= 3.5 ? 'جيد جداً' : gpa >= 2.7 ? 'جيد' : gpa >= 2 ? 'مقبول' : 'ضعيف';
 
     return `
 <div class="chat-widget gpa-card" style="margin-top:10px;border-radius:14px;
@@ -227,7 +232,7 @@
 
   <div style="flex:1;">
     <div style="font-size:.8rem;color:var(--muted);margin-bottom:4px;">المعدل التراكمي</div>
-    <div style="font-size:1.2rem;font-weight:900;color:${color};">${gpa.toFixed(2)} <span style="font-size:.85rem;font-weight:500;color:var(--muted);">/ 5.00</span></div>
+    <div style="font-size:1.2rem;font-weight:900;color:${color};">${gpa.toFixed(2)} <span style="font-size:.85rem;font-weight:500;color:var(--muted);">/ ${GPA_SCALE.toFixed(2)}</span></div>
     <div style="display:inline-block;margin-top:4px;background:${color}20;color:${color};
       border-radius:20px;padding:2px 10px;font-size:.75rem;font-weight:700;">${label}</div>
     ${target > gpa ? `<div style="font-size:.75rem;color:var(--muted);margin-top:4px;">🎯 الهدف: ${target.toFixed(2)}</div>` : ''}
@@ -246,18 +251,82 @@
      5. TRANSCRIPT ANALYSIS WIDGET — Full academic deep dive
      ════════════════════════════════════════════════════════════════ */
 
-  function renderTranscriptAnalysis(data) {
-    if (!data || !data.success) return '';
+  /**
+   * Normalize analyze_transcript tool result into the shape the widget expects.
+   * The tool returns: { average_gpa, total_courses, weaknesses:['name (grade)'], strengths:['name (grade)'] }
+   * The widget expects: { currentGpa, targetGpa, gradedCourses, totalCourses, weakSubjects:[{name,grade,code,difficulty}], ... }
+   */
+  function _normalizeTranscriptData(raw) {
+    // Read profile for supplementary data
+    var profile = (window.DataBridge && typeof window.DataBridge.getProfile === 'function')
+      ? window.DataBridge.getProfile() : null;
+    if (!profile) {
+      try { profile = JSON.parse(localStorage.getItem('uqu_profile_v2') || 'null'); } catch(e) { profile = null; }
+    }
+    var goals = profile?.goals || {};
+    var learning = profile?.learning || {};
 
-    const gpa        = parseFloat(data.currentGpa || 0);
-    const target     = parseFloat(data.targetGpa  || 5);
-    const pct        = Math.min(100, (gpa / 5) * 100);
-    const progressPct= Math.min(100, (gpa / target) * 100);
-    const gap        = parseFloat(data.gap || Math.max(0, target - gpa));
-    const gpaColor   = gpa >= 4 ? 'var(--success)' : gpa >= 3 ? '#6366f1' : gpa >= 2 ? 'var(--warning)' : 'var(--danger)';
-    const gpaLabel   = gpa >= 4.75 ? 'ممتاز بامتياز' : gpa >= 4 ? 'ممتاز' : gpa >= 3.75 ? 'جيد جداً' : gpa >= 3 ? 'جيد' : gpa >= 2 ? 'مقبول' : 'يحتاج تطوير';
-    const weak       = data.weakSubjects    || [];
-    const strong     = data.strongSubjects  || [];
+    // Parse GPA — tool returns 'average_gpa' as a string
+    var rawGpa = parseFloat(raw.average_gpa || raw.currentGpa || goals.currentGpa || profile?.currentGpa || 0);
+    var rawTarget = parseFloat(raw.targetGpa || goals.targetGpa || profile?.targetGpa || GPA_SCALE);
+    var gpa = Math.min(Math.max(rawGpa, 0), GPA_SCALE);
+    var target = Math.min(Math.max(rawTarget, 0), GPA_SCALE);
+    var totalCourses = parseInt(raw.total_courses || raw.totalCourses || 0);
+
+    // Parse weakness/strength strings like 'رياضيات (C)' into objects
+    function parseSubjectList(arr) {
+      if (!Array.isArray(arr)) return [];
+      return arr.map(function(s) {
+        if (typeof s === 'object' && s !== null) return s; // already an object
+        var match = String(s).match(/^(.+?)\s*\(([^)]+)\)$/);
+        if (match) {
+          var gradeStr = match[2].trim();
+          var GP = {'A+':4,'A':4,'A-':3.67,'B+':3.33,'B':3,'B-':2.67,'C+':2.33,'C':2,'C-':1.67,'D+':1.33,'D':1,'D-':0.67,'F':0};
+          return { name: match[1].trim(), grade: GP[gradeStr] != null ? GP[gradeStr] : (parseFloat(gradeStr) || 0), code: '', difficulty: 'medium' };
+        }
+        return { name: String(s), grade: 0, code: '', difficulty: 'medium' };
+      });
+    }
+
+    // Study style from profile learning preferences
+    var studyStyle = learning.style || learning.studyStyle || learning.method || 'لم يحدد';
+    var focusDuration = parseInt(learning.focusMinutes || learning.focusLength || learning.focus_length || 0);
+    var studyTime = learning.preferredTime || learning.bestTime || learning.best_time || 'لم يحدد';
+
+    return {
+      success: true,
+      currentGpa: gpa,
+      targetGpa: target,
+      totalCourses: totalCourses,
+      gradedCourses: totalCourses, // all courses from transcript are graded
+      weakSubjects: parseSubjectList(raw.weaknesses || raw.weakSubjects || []),
+      strongSubjects: parseSubjectList(raw.strengths || raw.strongSubjects || []),
+      gap: Math.max(0, target - gpa),
+      semesters: raw.semesters || null,
+      studyStyle: studyStyle,
+      focusDuration: focusDuration || null,
+      studyTime: studyTime,
+      trend: gpa >= 3.7 ? '📈 أداء متميز — استمر!' : gpa >= 2.7 ? '📊 أداء جيد — يمكنك تحسينه أكثر' : gpa >= 2.0 ? '📉 أداء متوسط — ركّز على المواد الضعيفة' : '⚠️ أداء يحتاج تطوير عاجل',
+      recommendation: raw.recommendation || null
+    };
+  }
+
+  function renderTranscriptAnalysis(rawData) {
+    if (!rawData || !rawData.success) return '';
+
+    // Normalize the data from the tool into the shape the widget expects
+    var data = _normalizeTranscriptData(rawData);
+    console.log('[ChatWidgets] Normalized transcript analysis data:', data);
+
+    const gpa        = data.currentGpa;
+    const target     = data.targetGpa;
+    const pct        = Math.min(100, (gpa / GPA_SCALE) * 100);
+    const progressPct= target > 0 ? Math.min(100, (gpa / target) * 100) : 0;
+    const gap        = data.gap;
+    const gpaColor   = gpa >= 3.7 ? 'var(--success)' : gpa >= 2.7 ? '#6366f1' : gpa >= 2 ? 'var(--warning)' : 'var(--danger)';
+    const gpaLabel   = gpa >= 3.85 ? 'ممتاز' : gpa >= 3.5 ? 'جيد جداً' : gpa >= 2.7 ? 'جيد' : gpa >= 2 ? 'مقبول' : 'يحتاج تطوير';
+    const weak       = data.weakSubjects;
+    const strong     = data.strongSubjects;
 
     function diffLabel(d) {
       return d === 'hard' ? 'صعبة' : d === 'easy' ? 'سهلة' : 'متوسطة';
@@ -306,7 +375,7 @@
     <div style="flex:1;">
       <div style="font-size:.75rem;color:var(--muted);margin-bottom:2px;">المعدل التراكمي</div>
       <div style="font-size:1.5rem;font-weight:900;color:${gpaColor};">
-        ${gpa.toFixed(2)}<span style="font-size:.85rem;color:var(--muted);font-weight:400;"> / 5.00</span>
+        ${gpa.toFixed(2)}<span style="font-size:.85rem;color:var(--muted);font-weight:400;"> / ${GPA_SCALE.toFixed(2)}</span>
       </div>
       <div style="margin-top:8px;">
         <div style="display:flex;justify-content:space-between;font-size:.71rem;color:var(--muted);margin-bottom:4px;">
@@ -441,7 +510,7 @@
       const spacing= Math.floor((W - 10) / history.length);
 
       const bars = history.map((s, i) => {
-        const barH = Math.max(4, Math.round((s.gpa / 5) * H));
+        const barH = Math.max(4, Math.round((s.gpa / GPA_SCALE) * H));
         const x    = 5 + i * spacing;
         const y    = H - barH;
         const col  = s.gpa >= 4 ? '#22c55e' : s.gpa >= 3 ? '#6366f1' : s.gpa >= 2 ? '#f59e0b' : '#ef4444';

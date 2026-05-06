@@ -47,7 +47,7 @@ async def _sync_transcript_logic(payload: TranscriptPayload, user_id: str):
         courses_sample = courses_dicts[:30]
 
         analysis_completion = await client.chat.completions.create(
-            model=settings.NVIDIA_MODEL,
+            model=settings.get_chat_model(),
             messages=[{
                 "role": "user",
                 "content": (
@@ -57,9 +57,9 @@ async def _sync_transcript_logic(payload: TranscriptPayload, user_id: str):
                     'أجب بـ JSON فقط: {"weaknesses":[], "strengths":[], "recommendations":[], "summary":""}'
                 ),
             }],
-            temperature=1.00,
+            temperature=settings.TEMPERATURE,
             top_p=1.00,
-            max_tokens=2048,
+            max_tokens=settings.MAX_TOKENS,
             extra_body={"chat_template_kwargs": {"thinking": True}},
         )
 

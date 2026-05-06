@@ -15,9 +15,11 @@ _ENV_PATH = Path(__file__).resolve().parent / ".env"
 class Settings(BaseSettings):
     """Application settings loaded from environment variables / .env file."""
 
-    # ── NVIDIA NIM API ──
-    NVIDIA_API_KEY: str
-    NVIDIA_MODEL: str = "moonshotai/kimi-k2-instruct"
+    # ── OpenAI / ChatGPT API ──
+    OPENAI_API_KEY: str = ""
+    OPENAI_MODEL: str = "gpt-4o-mini"
+    MAX_TOKENS: int = 600
+    TEMPERATURE: float = 0.3
 
     # ── Gemini API (for plan-generator + schedule-ai migrated from frontend) ──
     GEMINI_API_KEY: str = ""
@@ -29,6 +31,9 @@ class Settings(BaseSettings):
     # ── Server ──
     HOST: str = "0.0.0.0"
     PORT: int = 8000
+
+    def get_chat_model(self) -> str:
+        return self.OPENAI_MODEL.strip() or "gpt-3.5-turbo"
 
     model_config = {"env_file": str(_ENV_PATH), "env_file_encoding": "utf-8", "extra": "ignore"}
 

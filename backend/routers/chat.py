@@ -12,8 +12,9 @@ import time
 import logging
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from google.cloud.firestore_v1 import Increment
+from openai import AsyncOpenAI
 
 from schemas.chat import ChatRequest, ChatResponse
 from auth.dependencies import get_current_user_optional
@@ -21,90 +22,33 @@ from db.firestore import get_db
 from agent.prompts import build_system_prompt
 from agent.loop import run_agent_loop
 from services.fallback_brain import get_fallback_response
+from services.student import load_student_context
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Chat"])
 
 
-async def load_student_context(user_id: str, db) -> dict:
-    """Load full student context from Firestore.
-
-    Fetches ALL academic data for hyper-contextual prompting:
-    - User document (profile, study_preferences, analysis)
-    - Latest transcript (courses, semesters)
-    - Upcoming exams (not done)
-    - Active study plan
-    - Semester GPA history (from semesters sub-collection)
-    """
-    user_ref = db.collection("users").document(user_id)
-
-    # User data (profile + preferences + analysis)
-    user_snap = user_ref.get()
-    user_data = user_snap.to_dict() if user_snap.exists else {}
-
-    # Latest transcript
-    t_snaps = (user_ref.collection("transcripts")
-               .order_by("createdAt", direction="DESCENDING")
-               .limit(1).get())
-    t_docs = list(t_snaps)
-    transcript = t_docs[0].to_dict() if t_docs else None
-
-    # Semester GPA history (separate sub-collection)
-    sem_snaps = (user_ref.collection("semesters")
-                 .order_by("createdAt", direction="ASCENDING")
-                 .limit(20).get())
-    semesters = [d.to_dict() for d in sem_snaps]
-
-    # Merge semesters into transcript if transcript exists but has no semesters
-    if transcript and not transcript.get("semesters") and semesters:
-        transcript["semesters"] = semesters
-    elif not transcript and semesters:
-        transcript = {"courses": [], "semesters": semesters}
-
-    # Upcoming exams (not done, from today)
-    today = datetime.now().strftime("%Y-%m-%d")
-    e_snaps = (user_ref.collection("exams")
-               .where("done", "==", False)
-               .where("date", ">=", today)
-               .order_by("date")
-               .limit(10).get())
-    upcoming_exams = [d.to_dict() for d in e_snaps]
-
-    # Active study plan
-    p_snaps = (user_ref.collection("study_plans")
-               .where("active", "==", True)
-               .order_by("createdAt", direction="DESCENDING")
-               .limit(1).get())
-    p_docs = list(p_snaps)
-    active_plan = p_docs[0].to_dict() if p_docs else None
-
-    return {
-        "user_data": user_data,
-        "transcript": transcript,
-        "upcoming_exams": upcoming_exams,
-        "active_plan": active_plan,
-    }
-
-
 @router.post("/chat", response_model=ChatResponse)
 async def chat_legacy(
-    request: ChatRequest,
+    body: ChatRequest,
+    http_request: Request,
     user_id: str = Depends(get_current_user_optional),
 ):
     """Legacy route — POST /chat"""
-    return await _chat_logic(request, user_id)
+    return await _chat_logic(body, user_id, http_request.app.state.openai_client)
 
 
 @router.post("/api/chat", response_model=ChatResponse)
 async def chat(
-    request: ChatRequest,
+    body: ChatRequest,
+    http_request: Request,
     user_id: str = Depends(get_current_user_optional),
 ):
     """New route — POST /api/chat"""
-    return await _chat_logic(request, user_id)
+    return await _chat_logic(body, user_id, http_request.app.state.openai_client)
 
 
-async def _chat_logic(request: ChatRequest, user_id: str):
+async def _chat_logic(request: ChatRequest, user_id: str, openai_client: AsyncOpenAI):
     """Main AI Agent logic — shared by both routes.
 
     Mirrors: exports.chat from index.js lines 164-230
@@ -115,13 +59,11 @@ async def _chat_logic(request: ChatRequest, user_id: str):
         # ── Load context ──
         ctx = await load_student_context(user_id, db)
         
-        logger.info(f"========== CHAT CONTEXT DEBUG ==========")
-        logger.info(f"Resolved User UID: {user_id}")
-        logger.info(f"User Profile Exists: {bool(ctx.get('user_data'))}")
-        logger.info(f"Transcript Exists: {bool(ctx.get('transcript'))}")
-        logger.info(f"Upcoming Exams: {len(ctx.get('upcoming_exams', []))} found")
-        logger.info(f"Active Plan Exists: {bool(ctx.get('active_plan'))}")
-        logger.info(f"========================================")
+        logger.debug(
+            "[chat] context loaded — uid=%s profile=%s transcript=%s exams=%d plan=%s",
+            user_id, bool(ctx.get("user_data")), bool(ctx.get("transcript")),
+            len(ctx.get("upcoming_exams", [])), bool(ctx.get("active_plan")),
+        )
 
         # ── Validate messages ──
         if not request.messages:
@@ -149,14 +91,28 @@ async def _chat_logic(request: ChatRequest, user_id: str):
             ctx["upcoming_exams"],
             ctx["active_plan"],
         )
+
+        # ── Trim conversation history to prevent context overflow ──
+        # Keep only the last 6 messages (≈ 3 user↔assistant exchanges) to save tokens.
+        MAX_HISTORY = 6
+        trimmed = (
+            request.messages[-MAX_HISTORY:]
+            if len(request.messages) > MAX_HISTORY
+            else request.messages
+        )
+        logger.info(
+            "[chat] history: %d msgs → trimmed to %d",
+            len(request.messages), len(trimmed),
+        )
+
         full_messages = [
             {"role": "system", "content": system_prompt},
-            *[{"role": m.role, "content": m.content} for m in request.messages],
+            *[{"role": m.role, "content": m.content} for m in trimmed],
         ]
 
         # ── Run agent ──
         try:
-            result = await run_agent_loop(full_messages, user_id, db)
+            result = await run_agent_loop(full_messages, user_id, db, openai_client)
             content = result["content"]
             actions_log = result["actions_log"]
         except Exception as agent_err:
@@ -167,15 +123,17 @@ async def _chat_logic(request: ChatRequest, user_id: str):
             error_msg = "عذراً، واجه المحرك الذكي صعوبة في معالجة طلبك حالياً."
             low = err_str.lower()
             if "401" in err_str or "unauthorized" in low or "invalid" in low and "key" in low:
-                error_msg = "⚠️ مفتاح NVIDIA API غير صالح أو منتهي — راجع backend/.env"
+                error_msg = "⚠️ مفتاح OpenAI API غير صالح أو منتهي — راجع backend/.env"
             elif "404" in err_str or "not found" in low or "model" in low:
-                error_msg = f"⚠️ موديل الذكاء غير متاح ({err_str[:80]}). تحقق من NVIDIA_MODEL في backend/.env"
+                error_msg = f"⚠️ موديل الذكاء غير متاح ({err_str[:80]}). تحقق من OPENAI_MODEL أو OPENAI_API_KEY في backend/.env"
             elif "429" in err_str or "rate" in low:
                 error_msg = "⚠️ تم تجاوز الحد المسموح من الطلبات — جرّب مرة أخرى بعد دقيقة."
+            elif "max_tokens" in low and "too large" in low:
+                error_msg = "الرد المطلوب طويل جدًا، تم تقليل الحد الأقصى للتوكنز. حاول مرة أخرى."
             elif "timeout" in low or "timed out" in low:
                 error_msg = "⚠️ المحرك تأخر في الرد — حاول مرة أخرى."
             elif "connection" in low or "network" in low:
-                error_msg = "⚠️ تعذّر الاتصال بمزود الذكاء (NVIDIA NIM) — تحقق من اتصال السيرفر بالإنترنت."
+                error_msg = "⚠️ تعذّر الاتصال بمزود الذكاء (OpenAI) — تحقق من اتصال السيرفر بالإنترنت."
             else:
                 # Show the actual error tail so user/dev can debug
                 error_msg = f"⚠️ خطأ في المحرك الذكي: {err_str[:120]}"

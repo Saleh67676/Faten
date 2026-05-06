@@ -18,6 +18,22 @@ from agent.prompts import build_system_prompt
 from db.firestore import get_db
 from config import get_settings
 
+
+def _load_latest_transcript(user_ref):
+    snaps = (user_ref.collection("transcripts")
+             .order_by("createdAt", direction="DESCENDING")
+             .limit(1).get())
+    docs = list(snaps)
+    if docs:
+        return docs[0].to_dict()
+
+    snaps = (user_ref.collection("academic_records")
+             .where("type", "==", "transcript")
+             .order_by("createdAt", direction="DESCENDING")
+             .limit(1).get())
+    docs = list(snaps)
+    return docs[0].to_dict() if docs else None
+
 logger = logging.getLogger(__name__)
 
 
@@ -28,11 +44,7 @@ async def load_student_context_for_cron(user_id: str, db) -> dict:
     user_snap = user_ref.get()
     user_data = user_snap.to_dict() if user_snap.exists else {}
 
-    t_snaps = (user_ref.collection("transcripts")
-               .order_by("createdAt", direction="DESCENDING")
-               .limit(1).get())
-    t_docs = list(t_snaps)
-    transcript = t_docs[0].to_dict() if t_docs else None
+    transcript = _load_latest_transcript(user_ref)
 
     today = datetime.now().strftime("%Y-%m-%d")
     e_snaps = (user_ref.collection("exams")
@@ -85,16 +97,16 @@ async def daily_notifications_cron():
             )
 
             completion = await client.chat.completions.create(
-                model=settings.NVIDIA_MODEL,
+                model=settings.get_chat_model(),
                 messages=[
                     {"role": "system", "content": system_p},
                     {"role": "user", "content": "ابعث للطالب إشعاراً تحفيزياً صباحياً مناسباً لوضعه الأكاديمي الحالي. استخدم أداة send_notification."},
                 ],
                 tools=TOOLS_SCHEMA,
                 tool_choice={"type": "function", "function": {"name": "send_notification"}},
-                temperature=1.00,
+                temperature=settings.TEMPERATURE,
                 top_p=1.00,
-                max_tokens=1024,
+                max_tokens=settings.MAX_TOKENS,
                 extra_body={"chat_template_kwargs": {"thinking": True}},
             )
 

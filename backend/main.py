@@ -4,7 +4,7 @@ UQU ACADEMIC ASSISTANT — FastAPI Backend
 AI Agent Backend v2.0 (Python/FastAPI)
 ================================================================
 Endpoints:
-  POST /api/chat                 — AI Agent (NVIDIA kimi-k2.5 + Function Calling)
+  POST /api/chat                 — AI Agent (OpenAI ChatGPT + Function Calling)
   POST /api/sync-profile         — Sync localStorage profile → Firestore
   POST /api/sync-transcript      — OCR + AI analysis of transcript
   GET  /api/student-context      — Fetch full Firestore data for frontend
@@ -15,7 +15,7 @@ Endpoints:
 📌 Setup:
   1. pip install -r requirements.txt
   2. Place your Firebase serviceAccountKey.json in the backend/ folder
-  3. Edit .env with your NVIDIA API key
+  3. Edit .env with your OPENAI_API_KEY
   4. Run: uvicorn main:app --reload --port 8000
   5. Open: http://localhost:8000/docs (Swagger UI)
 ================================================================
@@ -23,11 +23,14 @@ Endpoints:
 
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
+from openai import AsyncOpenAI
 
 from config import get_settings
 from db.firestore import init_firestore
@@ -73,6 +76,16 @@ async def lifespan(app: FastAPI):
     init_firestore()
     logger.info("✅ Firestore initialized")
 
+    # Create the AsyncOpenAI client once and store on app.state so it shares
+    # the current event loop for the lifetime of this process. This avoids the
+    # @lru_cache pattern, which binds the client to a loop that closes on
+    # Uvicorn --reload, causing "Event loop is closed" errors.
+    settings = get_settings()
+    if not settings.OPENAI_API_KEY.strip():
+        raise RuntimeError("OPENAI_API_KEY must be set in backend/.env")
+    app.state.openai_client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+    logger.info("✅ OpenAI client initialized using OPENAI_API_KEY")
+
     # Schedule daily notifications cron (8:00 AM Riyadh = UTC+3)
     scheduler.add_job(
         daily_notifications_cron,
@@ -95,7 +108,11 @@ async def lifespan(app: FastAPI):
     try:
         if scheduler.running:
             scheduler.shutdown()
-            logger.info("👋 Backend shutting down.")
+    except Exception:
+        pass
+    try:
+        await app.state.openai_client.close()
+        logger.info("👋 OpenAI client closed. Backend shut down.")
     except Exception:
         pass
 
@@ -147,16 +164,6 @@ app.include_router(nav_router)
 
 
 # ── Health Check ──
-@app.get("/", tags=["Health"])
-async def root():
-    """Health check endpoint."""
-    return {
-        "status": "running",
-        "service": "UQU Academic Assistant API",
-        "version": "2.0.0",
-    }
-
-
 @app.get("/health", tags=["Health"])
 async def health():
     """Detailed health check."""
@@ -165,6 +172,14 @@ async def health():
         "firebase": "connected",
         "scheduler": "running" if scheduler.running else "stopped",
     }
+
+
+# ── Serve Frontend (HTML/CSS/JS from parent directory) ──
+# Mount AFTER all other routes to avoid catching API endpoints
+frontend_path = Path(__file__).parent.parent
+if (frontend_path / "index.html").exists():
+    app.mount("/", StaticFiles(directory=str(frontend_path), html=True), name="static")
+    logger.info(f"📁 Frontend mounted from: {frontend_path}")
 
 
 # ══════════════════════════════════════════════════════════════

@@ -80,7 +80,7 @@
               <div style="width:36px;height:36px;border-radius:10px;background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.2);display:flex;align-items:center;justify-content:center;">📈</div>
             </div>
             <div class="stat" id="dashCurrentGpa" data-countup data-decimals="2">—</div>
-            <div style="font-size:.72rem;color:var(--muted);margin-top:2px;">من أصل 5.00</div>
+            <div style="font-size:.72rem;color:var(--muted);margin-top:2px;">من أصل 4.00</div>
             <div id="dashGpaDelta" style="font-size:.8rem;color:var(--muted);margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
               أدخل بياناتك من صفحة البروفايل.
             </div>
@@ -366,7 +366,7 @@
            <div style="margin-bottom: 16px;">
              <label style="display:block; margin-bottom: 8px; font-weight: bold; color: var(--fg);">🎯 الهدف الأكاديمي (المعدل المستهدف)</label>
              <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 8px;">
-               <input type="number" id="obTargetGpaInput" step="0.01" value="5.00" style="flex:1; padding: 12px; border-radius: 6px; border: 2px solid var(--border-2); background: var(--bg); color: var(--fg); font-size: 1.2rem; font-weight: bold; transition: border 0.3s ease;">
+               <input type="number" id="obTargetGpaInput" step="0.01" value="4.00" style="flex:1; padding: 12px; border-radius: 6px; border: 2px solid var(--border-2); background: var(--bg); color: var(--fg); font-size: 1.2rem; font-weight: bold; transition: border 0.3s ease;">
                <label style="color: var(--muted); font-size: 0.8rem;">ساعات الخطة:</label>
                <input type="number" id="obPlanHoursInput" value="130" style="width: 80px; padding: 10px; border-radius: 6px; border: 1px solid var(--border-2); background: var(--bg); color: var(--fg);">
              </div>
@@ -749,7 +749,7 @@
         </div>`;
 
       // ── Tab: Chart ──
-      var maxGpa = 5.0;
+      var maxGpa = 4.0;
       var chartTabHTML = '<div id="diag-tab-chart" class="diag-panel">';
       chartTabHTML += '<div id="diag-line-chart" style="width:100%;height:200px;position:relative;margin-bottom:12px;"></div>';
 
@@ -847,7 +847,7 @@
     /* Fallback animated bar chart (used when LineChart unavailable or < 2 points) */
     function renderFallbackChart(el, history, targetGpa){
       if(!el || !history.length) return;
-      var maxGpa = 5.0;
+      var maxGpa = 4.0;
       var html = '<div style="display:flex;align-items:flex-end;justify-content:center;gap:10px;height:180px;padding:0 4px;">';
       history.forEach(function(s){
         var pct = Math.max((s.gpa / maxGpa) * 100, 6);

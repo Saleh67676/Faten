@@ -4,11 +4,11 @@ import io
 from datetime import datetime, timezone
 import pdfplumber
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
-from openai import AsyncOpenAI
 from pydantic import ValidationError
 
 from config import get_settings
 from auth.dependencies import get_current_user_optional, get_current_user
+from agent.loop import get_openai_client
 from schemas.onboarding import (
     OnboardingTranscriptResponse,
     TimetableResponse,
@@ -19,13 +19,6 @@ from db.firestore import get_db
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/onboarding", tags=["Onboarding"])
-
-def get_openai_client() -> AsyncOpenAI:
-    settings = get_settings()
-    return AsyncOpenAI(
-        base_url="https://integrate.api.nvidia.com/v1",
-        api_key=settings.NVIDIA_API_KEY,
-    )
 
 def extract_text_from_pdf(file_bytes: bytes) -> str:
     text = ""
@@ -68,7 +61,7 @@ async def analyze_transcript(
     
     You must extract:
     1. current_gpa (cumulative GPA)
-    2. gpa_scale (detect if it's 4.0 or 5.0. UQU is 5.0)
+    2. gpa_scale (detect if it's 4.0 or 5.0. UQU is 4.0)
     3. earned_hours (cumulative passed hours)
     4. plan_hours (total required for degree if found, else null)
     5. university (name of the university)
@@ -82,7 +75,7 @@ async def analyze_transcript(
 
     try:
         completion = await client.chat.completions.create(
-            model=settings.NVIDIA_MODEL,
+            model=settings.get_chat_model(),
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": f"Transcript text:\n\n{text}"}
@@ -138,7 +131,7 @@ async def analyze_timetable(
 
     try:
         completion = await client.chat.completions.create(
-            model=settings.NVIDIA_MODEL,
+            model=settings.get_chat_model(),
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": f"Timetable text:\n\n{text}"}

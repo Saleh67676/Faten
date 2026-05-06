@@ -1,4 +1,4 @@
-﻿/**
+/**
  * UQU TRANSCRIPT PARSER v2.0 - Smart Semester-Aware PDF Analyzer
  * Restored original client-side version using pdf.js
  */
@@ -6,7 +6,7 @@
   'use strict';
 
   const COURSE_CODE_RE = /^[A-Z]{2,4}\d{3,4}T?$/;
-  const GRADE_MAP = {'A+':5.00,'A':4.75,'B+':4.50,'B':4.00,'C+':3.50,'C':3.00,'D+':2.50,'D':2.00,'F':1.00,'DN':0,'W':null,'IP':null,'IC':null,'NP':null};
+  const GRADE_MAP = {'A+':4.00,'A':4.00,'B+':3.33,'B':3.00,'C+':2.33,'C':2.00,'D+':1.33,'D':1.00,'F':0.00,'DN':0,'W':null,'IP':null,'IC':null,'NP':null};
   const GRADE_COLORS = {'A+':'#10b981','A':'#10b981','B+':'#06b6d4','B':'#06b6d4','C+':'#f59e0b','C':'#f59e0b','D+':'#f97316','D':'#f97316','F':'#ef4444','DN':'#ef4444'};
   const GRADE_LABELS = {'A+':'ممتاز مرتفع','A':'ممتاز','B+':'جيد جداً مرتفع','B':'جيد جداً','C+':'جيد مرتفع','C':'جيد','D+':'مقبول مرتفع','D':'مقبول','F':'راسب','DN':'محروم'};
   const AR_SKIP_LABELS = /^(رمز|اسم|معتمدة|مكتسبة|الدرجة|التقدير|النقاط|المجموع|الفصل|الكلية|القسم|التخصص|الحالة|منتظم|ممتاز|جيد|مقبول|راسب|محروم|النقاط|الساعات|Course|Code|Name|Crd|Pass|Degree|Grade|Points|Hours|Hourse|sum|Faculty|Dept|Status|Major)/i;
@@ -440,7 +440,7 @@
       { icon: '🎓', label: 'الدرجة', value: data.degree },
       { icon: '📅', label: 'نوع الدراسة', value: data.studyType === 'full' ? 'انتظام' : (data.studyType === 'part' ? 'انتساب' : data.studyType) },
       { icon: '🆔', label: 'الرقم الجامعي', value: data.studentId },
-      { icon: '📊', label: 'المعدل التراكمي', value: data.gpa ? data.gpa.toFixed(2) + ' / ' + (window.APP_GPA_SCALE || '5.00') : null },
+      { icon: '📊', label: 'المعدل التراكمي', value: data.gpa ? data.gpa.toFixed(2) + ' / ' + (window.APP_GPA_SCALE || '4.00') : null },
       { icon: '⏱️', label: 'الساعات المكتسبة', value: data.earnedHours ? data.earnedHours + ' ساعة' : null },
       { icon: '📋', label: 'ساعات الخطة', value: data.planHours ? data.planHours + ' ساعة' : null },
     ];

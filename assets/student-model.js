@@ -232,10 +232,10 @@
   // ──────────────────────────────────────────────
 
   const GRADE_SCALE = {
-    'A+': 5.00, 'A': 4.75, 'A-': 4.50,
-    'B+': 4.25, 'B': 4.00, 'B-': 3.75,
-    'C+': 3.50, 'C': 3.00, 'C-': 2.50,
-    'D+': 2.25, 'D': 2.00, 'D-': 1.75,
+    'A+': 4.00, 'A': 4.00, 'A-': 3.67,
+    'B+': 3.33, 'B': 3.00, 'B-': 2.67,
+    'C+': 2.33, 'C': 2.00, 'C-': 1.67,
+    'D+': 1.33, 'D': 1.00, 'D-': 0.67,
     'F':  0.00
   };
 
@@ -269,8 +269,8 @@
       const allPoints   = prev * earned + termPoints;
       const newGpa      = totalEarned > 0 ? allPoints / totalEarned : 0;
       return {
-        newGpa:  +Math.min(5, newGpa).toFixed(4),
-        termGpa: +Math.min(5, termGpa).toFixed(4),
+        newGpa:  +Math.min(4, newGpa).toFixed(4),
+        termGpa: +Math.min(4, termGpa).toFixed(4),
         termHours, totalEarned,
         remaining: Math.max(0, plan - totalEarned)
       };

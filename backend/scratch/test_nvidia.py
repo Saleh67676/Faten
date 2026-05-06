@@ -5,14 +5,14 @@ from dotenv import load_dotenv
 
 load_dotenv("backend/.env")
 
-async def test_nvidia():
-    api_key = os.getenv("NVIDIA_API_KEY")
-    model = os.getenv("NVIDIA_MODEL", "moonshotai/kimi-k2-instruct")
+async def test_openai():
+    api_key = os.getenv("OPENAI_API_KEY")
+    model = os.getenv("OPENAI_MODEL", "gpt-3.5-turbo")
     
-    print(f"Testing NVIDIA NIM API...")
+    print(f"Testing OpenAI API...")
     print(f"Model: {model}")
     
-    url = f"https://integrate.api.nvidia.com/v1/chat/completions"
+    url = "https://api.openai.com/v1/chat/completions"
     
     headers = {
         "Authorization": f"Bearer {api_key}",
@@ -24,7 +24,7 @@ async def test_nvidia():
         "messages": [{"role": "user", "content": "مرحبا، هل تعمل؟"}],
         "temperature": 0.5,
         "top_p": 1,
-        "max_tokens": 1024
+        "max_tokens": 600
     }
     
     try:
@@ -42,4 +42,4 @@ async def test_nvidia():
             print(f"Details: {e.response.text}")
 
 if __name__ == "__main__":
-    asyncio.run(test_nvidia())
+    asyncio.run(test_openai())

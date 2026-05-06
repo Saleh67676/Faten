@@ -1,12 +1,10 @@
 /**
  * ════════════════════════════════════════════════════════════════
- * UQU AI SMART PLAN GENERATOR — Thin Client Wrapper
+ * UQU AI SMART PLAN GENERATOR — Frontend Client
  * ════════════════════════════════════════════════════════════════
- * Public API preserved 1:1 — same window.GeneratorEngine.generateAIPlan(state).
- * The Gemini call (and its hardcoded API key) was moved to the FastAPI
- * backend at POST /api/plan/generate. This file now just gathers the
- * same localStorage data the original prompt builder needed and forwards
- * it to the backend, returning the identical { reasoning, tasks } shape.
+ * Sends plan state to the FastAPI backend smart algorithm
+ * (POST /api/plan/generate) which returns { reasoning, tasks }.
+ * No external AI quota — the backend uses a pure rule-based engine.
  * ════════════════════════════════════════════════════════════════
  */
 
@@ -30,14 +28,29 @@
         place:   s.place   || ''
       }));
 
+      // Include schedule_slots per course so the backend can avoid lecture conflicts
+      const courses = (state?.courses || []).map(c => ({
+        id:              c.id              || null,
+        name:            c.name            || '',
+        difficulty:      c.difficulty      || 'medium',
+        examDate:        c.examDate        || null,
+        currentProgress: c.currentProgress || 0,
+        progressPerSession: c.progressPerSession || 0,
+        color:           c.color           || '#6366f1',
+        schedule_slots:  Array.isArray(c.schedule_slots) ? c.schedule_slots : []
+      }));
+
       const payload = {
-        courses: state?.courses || [],
+        courses,
         slots,
         profile: {
           preferences: learningProfile.learning || learningProfile.preferences || {},
           goals:       learningProfile.goals || {}
         },
-        completedCourses
+        completedCourses,
+        sessionMin: state?.sessionMin || 60,
+        weeks:      state?.weeks      || 1,
+        planStart:  state?.planStart  || ''
       };
 
       try {

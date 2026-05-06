@@ -135,7 +135,7 @@
             <h2 style="font-size:1.4rem;font-weight:900;margin-bottom:8px;
               background:linear-gradient(135deg,var(--accent),#a855f7);
               -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">
-              مرحباً! أنا فاتن 👋
+              مرحباً! أنا فطن 👋
             </h2>
             <p class="muted" style="max-width:380px;line-height:1.75;font-size:.9rem;margin:0 auto 24px;">
               مساعدك الأكاديمي الذكي لجامعة أم القرى.<br>
@@ -307,10 +307,12 @@
 
             const bar = document.getElementById('sidebarGpaBar');
             if (bar) {
-              bar.style.display = 'block';
-              const target = parseFloat(g.targetGpa || 5);
-              const pct    = Math.min(100, (gpa / target) * 100).toFixed(0);
-              document.getElementById('sidebarGpaLabel').textContent  = `${gpa.toFixed(2)} / 5.00`;
+              const GPA_SCALE = 4.0;
+              const rawTarget = parseFloat(g.targetGpa || GPA_SCALE);
+              const target = Math.min(Math.max(rawTarget, 0), GPA_SCALE);
+              const safeGpa = Math.min(Math.max(gpa, 0), GPA_SCALE);
+              const pct    = target > 0 ? Math.min(100, (safeGpa / target) * 100).toFixed(0) : 0;
+              document.getElementById('sidebarGpaLabel').textContent  = `${safeGpa.toFixed(2)} / 4.00`;
               document.getElementById('sidebarTarget').textContent    = `هدف: ${target.toFixed(2)}`;
               document.getElementById('sidebarGpaBarFill').style.width = pct + '%';
             }

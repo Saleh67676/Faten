@@ -3,10 +3,10 @@ from typing import List, Dict, Any, Optional
 
 # ── Grade scale (mirrors diagnostics.js) ──────────────────────
 GRADE_POINTS = {
-    'A+': 5.00, 'A': 4.75, 'A-': 4.50,
-    'B+': 4.25, 'B': 4.00, 'B-': 3.75,
-    'C+': 3.50, 'C': 3.00, 'C-': 2.50,
-    'D+': 2.25, 'D': 2.00, 'D-': 1.75, 'F': 0.00
+    'A+': 4.00, 'A': 4.00, 'A-': 3.67,
+    'B+': 3.33, 'B': 3.00, 'B-': 2.67,
+    'C+': 2.33, 'C': 2.00, 'C-': 1.67,
+    'D+': 1.33, 'D': 1.00, 'D-': 0.67, 'F': 0.00
 }
 
 def grade_from_score(s: float) -> str:
@@ -31,7 +31,7 @@ GRADE_TO_SCORE = {
 
 def resolve_grade(course: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Returns { "grade": 'A+', "points": 5.00, "score": 97 }
+    Returns { "grade": 'A+', "points": 4.00, "score": 97 }
     """
     grade = course.get("grade")
     score = float(course.get("score")) if course.get("score") is not None else None
@@ -81,15 +81,15 @@ def generate_diagnostics(semesters: List[Dict[str, Any]] = None, goals: Dict[str
 
     has_semester_data = len(all_courses) > 0
 
-    # ── Strengths: grade A- and above (points >= 4.50) ──────────
+    # ── Strengths: grade A- and above (points >= 3.67) ──────────
     strengths = sorted(
-        [c for c in all_courses if c["_points"] >= 4.50],
+        [c for c in all_courses if c["_points"] >= 3.67],
         key=lambda x: (-x["_points"], -x["_credits"])
     )[:6]
 
-    # ── Weaknesses: D+ and below (points <= 2.25), passed (not F) ──
+    # ── Weaknesses: D+ and below (points <= 1.33), passed (not F) ──
     weaknesses = sorted(
-        [c for c in all_courses if 0 < c["_points"] <= 2.25],
+        [c for c in all_courses if 0 < c["_points"] <= 1.33],
         key=lambda x: x["_points"]
     )[:5]
 
@@ -100,9 +100,9 @@ def generate_diagnostics(semesters: List[Dict[str, Any]] = None, goals: Dict[str
     dist = {"excellent": 0, "good": 0, "acceptable": 0, "poor": 0, "failed": 0}
     for c in all_courses:
         p = c["_points"]
-        if p >= 4.50: dist["excellent"] += 1
-        elif p >= 3.75: dist["good"] += 1
-        elif p >= 2.50: dist["acceptable"] += 1
+        if p >= 3.67: dist["excellent"] += 1
+        elif p >= 2.67: dist["good"] += 1
+        elif p >= 1.67: dist["acceptable"] += 1
         elif p > 0: dist["poor"] += 1
         else: dist["failed"] += 1
 
@@ -146,16 +146,16 @@ def generate_diagnostics(semesters: List[Dict[str, Any]] = None, goals: Dict[str
             # Formula: neededTermGpa = (target*(earned+S) - currentPoints) / S
             current_points = total_points or (current_gpa * earned_hours)
             needed = ((target_gpa * (earned_hours + term_hours)) - current_points) / term_hours
-            feasible = 0 <= needed <= 5.0
+            feasible = 0 <= needed <= 4.0
             
-            label = 'غير ممكن' if needed > 5 else \
-                    'صعب جداً' if needed > 4.5 else \
-                    'محتاج تركيز' if needed > 3.5 else \
-                    'ممكن' if needed > 2.5 else 'سهل'
+            label = 'غير ممكن' if needed > 4 else \
+                    'صعب جداً' if needed > 3.7 else \
+                    'محتاج تركيز' if needed > 3 else \
+                    'ممكن' if needed > 2 else 'سهل'
             
             goal_calc_results.append({
                 "termHours": term_hours,
-                "needed": round(min(5.0, max(0.0, needed)), 2),
+                "needed": round(min(4.0, max(0.0, needed)), 2),
                 "feasible": feasible,
                 "label": label
             })
@@ -217,8 +217,8 @@ def calc_required_sgpa(current_gpa: float, earned_hours: float, total_points: Op
     needed = ((target * (earned_hours + s)) - pts) / s
     
     return {
-        "needed": round(min(5.0, max(0.0, needed)), 2),
-        "feasible": 0 <= needed <= 5.0,
-        "impossible": needed > 5.0,
+        "needed": round(min(4.0, max(0.0, needed)), 2),
+        "feasible": 0 <= needed <= 4.0,
+        "impossible": needed > 4.0,
         "easy": needed <= 2.5
     }

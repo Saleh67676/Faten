@@ -1,6 +1,6 @@
 # UQU Academic Assistant — FastAPI Backend v2.0
 
-> المساعد الأكاديمي الذكي لجامعة أم القرى — Python/FastAPI + NVIDIA NIM + Firebase
+> المساعد الأكاديمي الذكي لجامعة أم القرى — Python/FastAPI + OpenAI + Firebase
 
 ## 🏗 Architecture
 
@@ -65,7 +65,7 @@ pip install -r requirements.txt
 
 # 2. Configure environment
 cp .env.example .env
-# Edit .env with your NVIDIA_API_KEY
+# Edit .env with your OPENAI_API_KEY
 
 # 3. Place Firebase credentials
 # Copy serviceAccountKey.json from Firebase Console
@@ -81,8 +81,8 @@ py -m uvicorn main:app --reload --port 8000
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `NVIDIA_API_KEY` | NVIDIA NIM API key | (required) |
-| `NVIDIA_MODEL` | AI model identifier | `moonshotai/kimi-k2.5` |
+| `OPENAI_API_KEY` | OpenAI / ChatGPT API key | (required) |
+| `OPENAI_MODEL` | OpenAI model identifier | `gpt-3.5-turbo` |
 | `FIREBASE_CREDENTIALS_PATH` | Path to serviceAccountKey.json | `serviceAccountKey.json` |
 | `HOST` | Server host | `0.0.0.0` |
 | `PORT` | Server port | `8000` |

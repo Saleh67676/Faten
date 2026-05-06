@@ -542,18 +542,10 @@
 
       // 2) Try backend in the background; merge if it has more data.
       try {
-        const baseUrl = window.AGENT_BASE_URL || 'http://localhost:8000';
-        const token = await window.UQUAuth?.getToken?.();
+        const token = await window.UQUCore.api.getToken();
         if (!token) return;
 
-        const response = await fetch(`${baseUrl}/api/pomodoro/stats`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (!response.ok) {
-          console.warn('[Pomodoro] stats fetch failed', response.status);
-          return;
-        }
-        const cloud = await response.json();
+        const cloud = await window.UQUCore.api.get('/api/pomodoro/stats');
         // Prefer the larger of (local, cloud) for each counter so freshly
         // saved local sessions don't disappear if Firestore hasn't synced.
         const local = computeLocalStats();

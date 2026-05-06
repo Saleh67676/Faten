@@ -11,6 +11,22 @@ from datetime import datetime, timezone, timedelta
 from google.cloud.firestore_v1 import ArrayUnion
 
 
+def _load_latest_transcript(user_ref):
+    snaps = (user_ref.collection("transcripts")
+             .order_by("createdAt", direction="DESCENDING")
+             .limit(1).get())
+    docs = list(snaps)
+    if docs:
+        return docs[0].to_dict()
+
+    snaps = (user_ref.collection("academic_records")
+             .where("type", "==", "transcript")
+             .order_by("createdAt", direction="DESCENDING")
+             .limit(1).get())
+    docs = list(snaps)
+    return docs[0].to_dict() if docs else None
+
+
 async def execute_tool(
     tool_name: str,
     args: dict,
@@ -105,11 +121,7 @@ async def execute_tool(
             data["profile"] = snap.to_dict() if snap.exists else {}
 
         if section in ("all", "transcript"):
-            snaps = (user_ref.collection("transcripts")
-                     .order_by("createdAt", direction="DESCENDING")
-                     .limit(1).get())
-            docs = list(snaps)
-            data["transcript"] = docs[0].to_dict() if docs else None
+            data["transcript"] = _load_latest_transcript(user_ref)
 
         if section in ("all", "exams"):
             snaps = (user_ref.collection("exams")
@@ -135,38 +147,58 @@ async def execute_tool(
 
     # ── 5. Analyze Transcript ──
     elif tool_name == "analyze_transcript":
-        snaps = (user_ref.collection("transcripts")
-                 .order_by("createdAt", direction="DESCENDING")
-                 .limit(1).get())
-        docs = list(snaps)
-        if not docs:
+        transcript = _load_latest_transcript(user_ref)
+        if not transcript:
             return {"success": False, "message": "لا يوجد سجل أكاديمي محفوظ بعد"}
-
-        transcript = docs[0].to_dict()
         courses = transcript.get("courses", [])
 
-        # Grade point mapping (Saudi 5-point scale — synced with frontend core.js)
+        # Grade point mapping (4.0 scale — synced with frontend core.js)
         GP = {
-            "A+": 5.00, "A": 4.75, "A-": 4.50,
-            "B+": 4.25, "B": 4.00, "B-": 3.75,
-            "C+": 3.50, "C": 3.00, "C-": 2.50,
-            "D+": 2.25, "D": 2.00, "D-": 1.75,
+            "A+": 4.00, "A": 4.00, "A-": 3.67,
+            "B+": 3.33, "B": 3.00, "B-": 2.67,
+            "C+": 2.33, "C": 2.00, "C-": 1.67,
+            "D+": 1.33, "D": 1.00, "D-": 0.67,
             "F":  0.00,
         }
 
         scored = []
+        def normalize_grade(g):
+            if not g: return ""
+            return str(g).strip().upper().replace(" ", "")
+
         for c in courses:
-            grade_str = c.get("grade", "")
+            raw_grade = c.get("grade") or c.get("letterGrade") or c.get("finalGrade") or c.get("courseGrade") or c.get("result") or ""
+            grade_str = normalize_grade(raw_grade)
+            
             gp = GP.get(grade_str)
             if gp is None:
                 try:
                     gp = float(grade_str)
                 except (ValueError, TypeError):
                     gp = 0
-            scored.append({**c, "gp": gp})
+            
+            # Also check numeric scores if gp is 0 and we have a score
+            if gp == 0:
+                raw_score = c.get("numericGrade") or c.get("score") or c.get("mark")
+                if raw_score:
+                    try:
+                        score_val = float(raw_score)
+                        if score_val >= 95: gp = 4.0
+                        elif score_val >= 90: gp = 4.0
+                        elif score_val >= 85: gp = 3.67
+                        elif score_val >= 80: gp = 3.33
+                        elif score_val >= 75: gp = 3.0
+                        elif score_val >= 70: gp = 2.67
+                        elif score_val >= 65: gp = 2.33
+                        elif score_val >= 60: gp = 2.0
+                        elif score_val >= 50: gp = 1.0
+                    except (ValueError, TypeError):
+                        pass
 
-        weaknesses = sorted([c for c in scored if c["gp"] < 3], key=lambda x: x["gp"])
-        strengths = [c for c in scored if c["gp"] >= 4.5]
+            scored.append({**c, "gp": gp, "norm_grade": grade_str})
+
+        weaknesses = sorted([c for c in scored if c["gp"] < 2.5 and c["gp"] > 0], key=lambda x: x["gp"])
+        strengths = [c for c in scored if c["gp"] >= 3.33 or c["norm_grade"] in ["A+", "A", "B+"]]
 
         if scored:
             total_weighted = sum(c["gp"] * (c.get("credit_hours") or c.get("creditHours") or 3) for c in scored)
@@ -183,13 +215,20 @@ async def execute_tool(
             "analysis.updatedAt":  now_iso,
         })
 
+        # Read targetGpa from profile for the response
+        profile = user_data.get("profile", {}) if (user_data := user_ref.get().to_dict()) else {}
+        target_gpa = profile.get("targetGpa") or 4.0
+
         return {
             "success": True,
             "focus": args.get("focus", "full"),
+            "average_gpa":   str(avg_gpa),
+            "currentGpa":    avg_gpa,
+            "targetGpa":     float(target_gpa),
+            "total_courses": len(courses),
+            "gradedCourses": len(scored),
             "weaknesses":    [f"{c.get('name', '')} ({c.get('grade', '')})" for c in weaknesses[:5]],
             "strengths":     [f"{c.get('name', '')} ({c.get('grade', '')})" for c in strengths[:5]],
-            "total_courses": len(courses),
-            "average_gpa":   str(avg_gpa),
         }
 
     # ── 6. Update Profile ──
@@ -344,24 +383,21 @@ async def execute_tool(
         prefs = user_data.get("study_preferences", {})
 
         # Read transcript for completed courses
-        t_snaps = (user_ref.collection("transcripts")
-                   .order_by("createdAt", direction="DESCENDING")
-                   .limit(1).get())
-        t_docs = list(t_snaps)
+        transcript = _load_latest_transcript(user_ref)
 
-        # Grade point mapping (Saudi 5-point scale — synced with frontend core.js)
+        # Grade point mapping (4.0 scale — synced with frontend core.js)
         GP = {
-            "A+": 5.00, "A": 4.75, "A-": 4.50,
-            "B+": 4.25, "B": 4.00, "B-": 3.75,
-            "C+": 3.50, "C": 3.00, "C-": 2.50,
-            "D+": 2.25, "D": 2.00, "D-": 1.75,
+            "A+": 4.00, "A": 4.00, "A-": 3.67,
+            "B+": 3.33, "B": 3.00, "B-": 2.67,
+            "C+": 2.33, "C": 2.00, "C-": 1.67,
+            "D+": 1.33, "D": 1.00, "D-": 0.67,
             "F":  0.00,
         }
         GRADE_LABELS = {
-            5.00: "A+", 4.75: "A",  4.50: "A-",
-            4.25: "B+", 4.00: "B",  3.75: "B-",
-            3.50: "C+", 3.00: "C",  2.50: "C-",
-            2.25: "D+", 2.00: "D",  1.75: "D-",
+            4.00: "A+", 3.67: "A-",
+            3.33: "B+", 3.00: "B",  2.67: "B-",
+            2.33: "C+", 2.00: "C",  1.67: "C-",
+            1.33: "D+", 1.00: "D",  0.67: "D-",
             0.00: "F",
         }
 
@@ -369,8 +405,7 @@ async def execute_tool(
         completed_hours = 0
         total_quality_points = 0.0
 
-        if t_docs:
-            transcript = t_docs[0].to_dict()
+        if transcript:
             for c in transcript.get("courses", []):
                 grade_str = c.get("grade", "")
                 gp = GP.get(grade_str)
@@ -425,10 +460,10 @@ async def execute_tool(
         # Required average GPA this semester
         required_semester_gpa = round(remaining_qp_needed / current_semester_hours, 2)
 
-        if required_semester_gpa > 5.0:
+        if required_semester_gpa > 4.0:
             return {
                 "success": True,
-                "message": f"⚠️ للأسف، الوصول لمعدل {target} يتطلب معدل فصلي {required_semester_gpa} وهو مستحيل (أعلى من 5.0). جرب هدفاً أقل أو انتظر فصول إضافية.",
+                "message": f"⚠️ للأسف، الوصول لمعدل {target} يتطلب معدل فصلي {required_semester_gpa} وهو مستحيل (أعلى من 4.0). جرب هدفاً أقل أو انتظر فصول إضافية.",
                 "current_gpa": str(current_gpa),
                 "target_gpa": str(target),
                 "required_semester_gpa": str(required_semester_gpa),
@@ -441,7 +476,7 @@ async def execute_tool(
 
         # Find closest grade label
         def closest_grade(gp_val):
-            gp_val = max(0, min(5.0, gp_val))
+            gp_val = max(0, min(4.0, gp_val))
             closest = min(GRADE_LABELS.keys(), key=lambda x: abs(x - gp_val))
             return GRADE_LABELS[closest], closest
 
@@ -453,15 +488,15 @@ async def execute_tool(
             if scenario == "minimum":
                 # Give harder courses lower targets, easier ones higher
                 if difficulty == "hard":
-                    needed = min(required_semester_gpa - 0.5, 5.0)
+                    needed = min(required_semester_gpa - 0.5, 4.0)
                 elif difficulty == "easy":
-                    needed = min(required_semester_gpa + 0.5, 5.0)
+                    needed = min(required_semester_gpa + 0.5, 4.0)
                 else:
-                    needed = min(required_semester_gpa, 5.0)
+                    needed = min(required_semester_gpa, 4.0)
             elif scenario == "ambitious":
-                needed = min(required_semester_gpa + 0.5, 5.0)
+                needed = min(required_semester_gpa + 0.5, 4.0)
             else:  # balanced
-                needed = min(required_semester_gpa, 5.0)
+                needed = min(required_semester_gpa, 4.0)
 
             grade_label, grade_gp = closest_grade(needed)
             course_targets.append({
@@ -571,10 +606,10 @@ async def execute_tool(
 
         # ── 3. Read transcript for weakness weighting ──
         GP = {
-            "A+": 5.00, "A": 4.75, "A-": 4.50,
-            "B+": 4.25, "B": 4.00, "B-": 3.75,
-            "C+": 3.50, "C": 3.00, "C-": 2.50,
-            "D+": 2.25, "D": 2.00, "D-": 1.75,
+            "A+": 4.00, "A": 4.00, "A-": 3.67,
+            "B+": 3.33, "B": 3.00, "B-": 2.67,
+            "C+": 2.33, "C": 2.00, "C-": 1.67,
+            "D+": 1.33, "D": 1.00, "D-": 0.67,
             "F":  0.00,
         }
 
@@ -891,7 +926,7 @@ async def execute_tool(
         return {
             "success": True,
             "id": ref.id,
-            "message": f"تم تسجيل {args['name']} بمعدل {args['gpa']} / 5.00",
+            "message": f"تم تسجيل {args['name']} بمعدل {args['gpa']} / 4.00",
         }
 
     # ── 18. Update Course Grade ──
@@ -927,7 +962,7 @@ async def execute_tool(
         user_ref.update({"profile.courses": courses, "updatedAt": now_iso})
         return {
             "success": True,
-            "message": f"تم تحديث درجة {course_name} إلى {grade} / 5.00",
+            "message": f"تم تحديث درجة {course_name} إلى {grade} / 4.00",
         }
 
     # ── Unknown tool ──

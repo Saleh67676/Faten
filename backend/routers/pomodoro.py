@@ -25,6 +25,7 @@ from schemas.pomodoro import (
     PomodoroSessionLog, PomodoroLogResponse, PomodoroStats,
     PomodoroSession, PomodoroSessionListResponse, PomodoroSettings
 )
+from services.pomodoro import calculate_pomodoro_stats
 
 logger = logging.getLogger(__name__)
 
@@ -64,8 +65,6 @@ async def log_completed_session(
             detail="فشل تسجيل جلسة البومودورو",
         )
 
-
-from services.pomodoro import calculate_pomodoro_stats
 
 @router.get("/stats", response_model=PomodoroStats)
 async def get_pomodoro_stats(

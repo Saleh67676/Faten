@@ -21,10 +21,6 @@
     'أخبار': 'var(--accent)'
   };
 
-  function _getBackendBase() {
-    return window.AGENT_BASE_URL || 'http://localhost:8000';
-  }
-
   // ── Render news cards into the grid ──
   function _renderNewsHTML(items) {
     var grid = document.getElementById('uquNewsGrid');
@@ -59,15 +55,8 @@
 
   async function renderNews() {
     try {
-      const response = await fetch(_getBackendBase() + '/api/news', {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' }
-      });
-      if (!response.ok) throw new Error('News fetch failed');
-      const data = await response.json();
-      if (data && data.items) {
-        _renderNewsHTML(data.items);
-      }
+      const data = await window.UQUCore.api.get('/api/news', { skipAuth: true });
+      if (data && data.items) _renderNewsHTML(data.items);
     } catch (err) {
       console.warn('[UQUNews] Fetch error:', err);
     }

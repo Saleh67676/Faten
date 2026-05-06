@@ -48,10 +48,10 @@ class NavigationService:
                 self.nav_graph = data.get("navGraph", {"nodes": {}, "edges": []})
             
             if self.map_data:
-                print(f"DEBUG: ✓ Navigation data loaded from JSON ({len(self.map_data)} rooms)")
+                print(f"DEBUG: [OK] Navigation data loaded from JSON ({len(self.map_data)} rooms)")
             
         except Exception as e:
-            print(f"DEBUG: ✗ JSON Loading Error: {e}")
+            print(f"DEBUG: [ERROR] JSON Loading Error: {e}")
             self.map_data = []
             self.nav_graph = {"nodes": {}, "edges": []}
 

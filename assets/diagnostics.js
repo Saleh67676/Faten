@@ -8,10 +8,10 @@
 
   // ── Grade scale (mirrors student-model.js) ──────────────────────
   const GRADE_POINTS = {
-    'A+': 5.00, 'A': 4.75, 'A-': 4.50,
-    'B+': 4.25, 'B': 4.00, 'B-': 3.75,
-    'C+': 3.50, 'C': 3.00, 'C-': 2.50,
-    'D+': 2.25, 'D': 2.00, 'D-': 1.75, 'F': 0.00
+    'A+': 4.00, 'A': 4.00, 'A-': 3.67,
+    'B+': 3.33, 'B': 3.00, 'B-': 2.67,
+    'C+': 2.33, 'C': 2.00, 'C-': 1.67,
+    'D+': 1.33, 'D': 1.00, 'D-': 0.67, 'F': 0.00
   };
 
   const GRADE_FROM_SCORE = s => {
@@ -46,23 +46,9 @@
    */
   async function generateDiagnostics(semesters = [], currentCourses = [], goals = {}) {
     try {
-      const baseUrl = window.AGENT_BASE_URL || 'http://localhost:8000';
-      const token = await (window.UQUAuth?.getToken?.() || Promise.resolve(null));
-
-      const headers = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-
-      const res = await fetch(`${baseUrl}/api/diagnostics/analyze`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ semesters, currentCourses, goals })
-      });
-
-      if (!res.ok) throw new Error('فشل تحليل البيانات من الخادم');
-      return await res.json();
+      return await window.UQUCore.api.post('/api/diagnostics/analyze', { semesters, currentCourses, goals });
     } catch (err) {
       console.error('Diagnostics Error:', err);
-      // Return a basic empty structure to prevent UI crash
       return {
         hasSemesterData: false,
         insights: [{ type: 'danger', icon: '❌', text: 'عذراً، فشل الاتصال بمحرك التحليل.' }],
@@ -77,23 +63,10 @@
    */
   async function calcRequiredSGPA(currentGpa, earnedHours, totalPoints, targetGpa, termHours) {
     try {
-      const baseUrl = window.AGENT_BASE_URL || 'http://localhost:8000';
-      const token = await (window.UQUAuth?.getToken?.() || Promise.resolve(null));
-
-      const headers = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-
-      const res = await fetch(`${baseUrl}/api/diagnostics/calculate-goal`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ currentGpa, earnedHours, totalPoints, targetGpa, termHours })
-      });
-
-      if (!res.ok) throw new Error('فشل الحساب من الخادم');
-      return await res.json();
+      return await window.UQUCore.api.post('/api/diagnostics/calculate-goal', { currentGpa, earnedHours, totalPoints, targetGpa, termHours });
     } catch (err) {
       console.error('Goal Calc Error:', err);
-      return { needed: 0, feasible: false, impossible: true };
+      return [];
     }
   }
 
@@ -191,7 +164,7 @@
           </tbody>
         </table>
         <div style="font-size:.72rem;color:var(--muted);margin-top:8px;text-align:center;">
-          الهدف التراكمي: <strong style="color:var(--accent);">${targetGpa}</strong> من 5.00
+          الهدف التراكمي: <strong style="color:var(--accent);">${targetGpa}</strong> من 4.00
         </div>
       </div>`;
   }

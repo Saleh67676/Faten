@@ -9,12 +9,12 @@ feel like it truly "knows" the student.
 from datetime import datetime
 
 
-# ── Grade-point mapping (Saudi 5.0 scale — synced with frontend core.js) ──
+# ── Grade-point mapping (4.0 scale — synced with frontend core.js) ──
 GP_MAP = {
-    "A+": 5.00, "A": 4.75, "A-": 4.50,
-    "B+": 4.25, "B": 4.00, "B-": 3.75,
-    "C+": 3.50, "C": 3.00, "C-": 2.50,
-    "D+": 2.25, "D": 2.00, "D-": 1.75,
+    "A+": 4.00, "A": 4.00, "A-": 3.67,
+    "B+": 3.33, "B": 3.00, "B-": 2.67,
+    "C+": 2.33, "C": 2.00, "C-": 1.67,
+    "D+": 1.33, "D": 1.00, "D-": 0.67,
     "F":  0.00,
 }
 
@@ -25,79 +25,47 @@ def build_system_prompt(
     upcoming_exams: list | None = None,
     active_plan: dict | None = None
 ) -> str:
-    """Build a hyper-contextual system prompt.
+    """Build a concise, contextual system prompt.
 
-    Injects full academic intelligence:
-    - Student profile & personality
-    - GPA history & trend analysis
-    - Current semester workload pressure
-    - Learning style & stress level
-    - Upcoming exam urgency signals
-    - Proactive behavioral rules
+    Focus on essential info only to save tokens.
     """
     user_data = user_data or {}
     upcoming_exams = upcoming_exams or []
 
-    today = datetime.now()
-    today_str = today.strftime("%Y-%m-%d")
-    today_ar = today.strftime("%A, %Y-%m-%d")
-
     profile = user_data.get("profile", {})
     prefs = user_data.get("study_preferences", {})
-    analysis = user_data.get("analysis", {})
 
-    # ══════════════════════════════════════════════════
-    #  BLOCK 1: Agent Identity & Core Personality
-    # ══════════════════════════════════════════════════
-    prompt = f"""أنت "فاتن" — الوكيل الأكاديمي الذكي لمنصة UQU Academic Assistant.
-تاريخ اليوم: {today_ar}
-
-═══ هويتك ═══
-• مساعد أكاديمي خبير متخصص في النظام الجامعي السعودي (مقياس 5 نقاط).
-• تتحدث بالعربية الفصحى مع لمسة خليجية ودية.
-• موجز، عملي، ومشجع. تستخدم إيموجي باعتدال.
-• تُنفّذ الإجراءات فعلياً بأدواتك — لا تقترح فقط.
-• لا تطلب معلومات موجودة في السياق.
+    prompt = """أنت "فطن" — مساعد أكاديمي ذكي لجامعة أم القرى.
+• متخصص في النظام السعودي (مقياس 5 نقاط).
+• موجز وعملي. استخدم أدواتك لتنفيذ الإجراءات.
 • لا تخترع بيانات غير موجودة.
 """
 
-    # ══════════════════════════════════════════════════
-    #  BLOCK 2: Student Profile & Identity
-    # ══════════════════════════════════════════════════
-    has_profile = bool(profile.get("name") or profile.get("major"))
-    if has_profile:
-        prompt += "\n═══ 🎓 بيانات الطالب ═══\n"
-        if profile.get("name"):
-            prompt += f"الاسم: {profile['name']}\n"
-        if profile.get("university"):
-            prompt += f"الجامعة: {profile['university']}\n"
-        if profile.get("major"):
-            prompt += f"التخصص: {profile['major']}\n"
-        if profile.get("level"):
-            prompt += f"المستوى: {profile['level']}\n"
-        if profile.get("currentGpa") is not None:
-            prompt += f"المعدل التراكمي: {profile['currentGpa']} / 5.00\n"
-        if profile.get("targetGpa"):
-            prompt += f"الهدف الأكاديمي: {profile['targetGpa']} / 5.00\n"
-        if profile.get("earnedHours"):
-            prompt += f"الساعات المكتسبة: {profile['earnedHours']}\n"
+    # Add key student info if available
+    if profile.get("name"):
+        prompt += f"\nالطالب: {profile['name']}"
+    if profile.get("currentGpa"):
+        prompt += f" | معدل: {profile['currentGpa']}/4.0"
+    if profile.get("targetGpa"):
+        prompt += f" | هدف: {profile['targetGpa']}/4.0"
+    if profile.get("earnedHours"):
+        prompt += f" | ساعات منجزة: {profile['earnedHours']}"
+    if profile.get("planHours"):
+        remaining = max(0, (profile.get("planHours") or 0) - (profile.get("earnedHours") or 0))
+        prompt += f" | ساعات الخطة: {profile['planHours']} | متبقية: {remaining}"
+    if profile.get("termPlanHours"):
+        prompt += f" | ساعات الفصل: {profile['termPlanHours']}"
 
-        gap = None
-        if profile.get("targetGpa") and profile.get("currentGpa"):
-            try:
-                gap = float(profile["targetGpa"]) - float(profile["currentGpa"])
-                if gap > 0:
-                    prompt += f"📏 الفجوة عن الهدف: {gap:.2f} نقطة\n"
-                else:
-                    prompt += "✅ المعدل يتجاوز الهدف — ما شاء الله!\n"
-            except (ValueError, TypeError):
-                pass
-    else:
-        prompt += "\n⚠️ الطالب لم يكمل ملفه الشخصي بعد. شجّعه على إضافة بياناته.\n"
+    today = datetime.now()
+    today_str = today.strftime("%Y-%m-%d")
+    analysis = user_data.get("analysis", {})
 
-    # ══════════════════════════════════════════════════
-    #  BLOCK 3: Learning Personality Profile
-    # ══════════════════════════════════════════════════
+    # Add upcoming exams if any
+    if upcoming_exams:
+        prompt += "\nامتحانات قادمة:"
+        for exam in upcoming_exams[:3]:  # Limit to 3 exams
+            prompt += f" • {exam.get('subject', '')} في {exam.get('date', '')}"
+
     if prefs:
         prompt += "\n═══ 🧠 شخصية التعلم ═══\n"
 

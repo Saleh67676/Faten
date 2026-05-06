@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from auth.dependencies import get_current_user
 from db.firestore import get_db
+from services.student import load_student_context
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Student"])
@@ -24,7 +25,6 @@ async def _get_student_context_logic(user_id: str):
     try:
         db = get_db()
 
-        from routers.chat import load_student_context
         ctx = await load_student_context(user_id, db)
 
         user_ref = db.collection("users").document(user_id)
