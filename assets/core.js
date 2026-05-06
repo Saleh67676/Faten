@@ -364,6 +364,20 @@
   let _revealObserver = null;
 
   function observeReveal(selector, rootMargin) {
+    const reduced = window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    // With reduced motion (or no IntersectionObserver), reveal everything
+    // immediately. Don't gate content on animations the user opted out of.
+    if (reduced || typeof IntersectionObserver === 'undefined') {
+      $$(selector || '.animate-block').forEach(el => {
+        el.classList.add('animate-in');
+        el.style.opacity = '';
+        el.style.transform = '';
+      });
+      return;
+    }
+
     if (!_revealObserver) {
       _revealObserver = new IntersectionObserver(entries => {
         entries.forEach(e => {
@@ -375,11 +389,23 @@
       }, { threshold: 0.08, rootMargin: rootMargin || '0px 0px -40px 0px' });
     }
 
+    const vh = window.innerHeight || document.documentElement.clientHeight;
     $$(selector || '.animate-block').forEach(el => {
       el.style.opacity = '0';
       el.style.transform = 'translateY(24px)';
       el.style.transition = 'opacity 0.55s cubic-bezier(0.4,0,0.2,1), transform 0.55s cubic-bezier(0.4,0,0.2,1)';
-      _revealObserver.observe(el);
+
+      // Synchronous fallback: if the element is already in the initial
+      // viewport, reveal it on the next frame regardless of whether the
+      // IntersectionObserver fires (some browsers/contexts delay or skip
+      // the first batch). The observer still handles off-screen elements.
+      const r = el.getBoundingClientRect();
+      const inViewport = r.bottom > 0 && r.top < vh && r.width > 0 && r.height > 0;
+      if (inViewport) {
+        requestAnimationFrame(() => el.classList.add('animate-in'));
+      } else {
+        _revealObserver.observe(el);
+      }
     });
   }
 
@@ -561,7 +587,117 @@
   }, 2000); // 2-second TTL so rapid keystrokes don't thrash
 
   // ────────────────────────────────────────────
-  // 17. EXPOSE
+  // 17. BACKEND API CLIENT (single source of truth)
+  //     Replaces the _getBackendBase / _getIdToken pattern duplicated
+  //     in ai.js, engine.js, plan-generator.js, ai-service.js,
+  //     pomodoro.js, notifications.js, firebase-db.js, app.js.
+  // ────────────────────────────────────────────
+
+  /**
+   * Wait for Firebase auth state to settle. Without this, calls fired
+   * during page-load race conditions get a null token and the backend
+   * rejects them with 401.
+   */
+  async function _waitForAuth(timeoutMs) {
+    if (typeof firebase === 'undefined' || !firebase.auth) return null;
+    const auth = firebase.auth();
+    if (auth.currentUser) return auth.currentUser;
+    return new Promise(resolve => {
+      const t = setTimeout(() => { try { unsub(); } catch(_) {} resolve(auth.currentUser || null); }, timeoutMs || 1500);
+      const unsub = auth.onAuthStateChanged(user => {
+        clearTimeout(t);
+        try { unsub(); } catch(_) {}
+        resolve(user);
+      });
+    });
+  }
+
+  const api = {
+    baseUrl() { return window.AGENT_BASE_URL || 'http://localhost:8000'; },
+
+    /** Get a Firebase ID token from any available source. Null if not signed in. */
+    async getToken() {
+      try {
+        if (typeof firebase !== 'undefined' && firebase.auth) {
+          const auth = firebase.auth();
+          // First call waits for auth to settle (avoids 401 race on page load).
+          let u = auth.currentUser;
+          if (u === null || u === undefined) u = await _waitForAuth(1500);
+          if (u && typeof u.getIdToken === 'function') return await u.getIdToken();
+        }
+      } catch (_) { /* fall through */ }
+      if (window.FirebaseAuth?.getIdToken) {
+        try { return await window.FirebaseAuth.getIdToken(); } catch (_) {}
+      }
+      if (window.FirebaseDB?.getIdToken) {
+        try { return await window.FirebaseDB.getIdToken(); } catch (_) {}
+      }
+      return null;
+    },
+
+    /**
+     * Generic fetch wrapper. Accepts the same options as fetch() plus:
+     *   - body: object → auto-JSON-stringified
+     *   - skipAuth: true → don't attach the Bearer header
+     */
+    async fetch(path, options) {
+      options = options || {};
+      const url = path.startsWith('http') ? path : (this.baseUrl() + path);
+      const token = options.skipAuth ? null : await this.getToken();
+      const init = {
+        method: options.method || 'GET',
+        headers: Object.assign(
+          { 'Content-Type': 'application/json' },
+          options.headers || {},
+          token ? { 'Authorization': 'Bearer ' + token } : {}
+        )
+      };
+      if (options.body !== undefined) {
+        init.body = typeof options.body === 'string'
+          ? options.body
+          : JSON.stringify(options.body);
+      }
+      if (options.signal) init.signal = options.signal;
+      return fetch(url, init);
+    },
+
+    /** POST JSON, return parsed response. Throws on !ok with backend `detail`. */
+    async post(path, body, opts) {
+      const res = await this.fetch(path, Object.assign({}, opts, { method: 'POST', body }));
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        const e = new Error(err?.detail || ('HTTP ' + res.status));
+        e.status = res.status;
+        throw e;
+      }
+      return res.json();
+    },
+
+    /** GET JSON, return parsed response. Throws on !ok with backend `detail`. */
+    async get(path, opts) {
+      const res = await this.fetch(path, Object.assign({}, opts, { method: 'GET' }));
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        const e = new Error(err?.detail || ('HTTP ' + res.status));
+        e.status = res.status;
+        throw e;
+      }
+      return res.json();
+    },
+
+    /** POST JSON, return success boolean (no throw). Used for fire-and-forget syncs. */
+    async tryPost(path, body, opts) {
+      try {
+        const res = await this.fetch(path, Object.assign({}, opts, { method: 'POST', body }));
+        return res.ok;
+      } catch (_) {
+        return false;
+      }
+    }
+  };
+
+  // ────────────────────────────────────────────
+  // 18. EXPOSE
   // ────────────────────────────────────────────
 
   const UQUCore = Object.freeze({
@@ -604,7 +740,10 @@
     normalizeAr,
 
     // Grades
-    GRADE_SCALE, scoreToGrade, scoreToPoints, calcGPA
+    GRADE_SCALE, scoreToGrade, scoreToPoints, calcGPA,
+
+    // Backend HTTP client
+    api
   });
 
   window.UQUCore = UQUCore;

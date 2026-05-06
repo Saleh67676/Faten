@@ -68,7 +68,7 @@ async def analyze_schedule_with_ai(
         system_prompt=SYSTEM_PROMPT,
         user_content=user_content,
         temperature=0.1,
-        response_mime_type=None,  # ai-service.js does not request JSON mime — it post-processes fences
+        response_mime_type="application/json",  # force structured JSON output
     )
 
     if not isinstance(parsed, list):

@@ -212,6 +212,19 @@
 
       console.log('[FirebaseDB] ✅ Full Firestore sync complete');
 
+      // Broadcast that all collections have been hydrated. This is the
+      // canonical signal for dashboards / pomodoro / charts to re-render
+      // with the freshly pulled data — listening on `uqu:firebaseReady`
+      // (dispatched in init) is not enough because that fires before the
+      // pull completes.
+      window.dispatchEvent(new CustomEvent('uqu:profileUpdated'));
+      window.dispatchEvent(new CustomEvent('uqu:examsUpdated', {
+        detail: { exams: sGet(LS_KEYS.EXAMS) || [] }
+      }));
+      window.dispatchEvent(new CustomEvent('uqu:planUpdated', {
+        detail: { plan: (sGet(LS_KEYS.PLAN) || {})._firestorePlan || null }
+      }));
+
     } catch (err) {
       console.error('[FirebaseDB] Pull error:', err);
     } finally {
@@ -277,54 +290,21 @@
     if (!profile) return;
 
     try {
-      const token = await getIdToken();
-
-      // Try FastAPI backend first
-      const base = window.AGENT_BASE_URL;
-      if (base && !base.includes('REPLACE') && token) {
-        try {
-          const res = await fetch(`${base}/syncProfile`, {
-            method:  'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body:    JSON.stringify(profile)
-          });
-          if (res.ok) return;
-        } catch (_) {}
-      }
-
-      // Fallback: direct Firestore write
+      // Try FastAPI backend first; falls back to direct Firestore write.
+      const ok = await window.UQUCore.api.tryPost('/syncProfile', profile);
+      if (ok) return;
       await _pushProfileDirect(profile);
     } catch (err) {
       console.error('[FirebaseDB] Push profile error:', err);
-      // Mark as dirty for later sync
       profile._localDirty = true;
       sSet(LS_KEYS.PROFILE, profile);
     }
   }
 
-  /* Backend base URL — same lookup pattern used by pushProfileToFirestore. */
-  function _backendBase() {
-    return window.AGENT_BASE_URL || window.UQU_BACKEND_URL || window.BACKEND_URL || '';
-  }
-
+  /** Wrapper around UQUCore.api.tryPost — returns true on success. */
   async function _backendPost(path, payload) {
-    const base = _backendBase();
-    if (!base || base.includes('REPLACE')) return false;
-    const token = await getIdToken();
-    if (!token) return false;
-    try {
-      const res = await fetch(`${base}${path}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(payload)
-      });
-      return res.ok;
-    } catch (_) {
-      return false;
-    }
+    if (!_userId) return false;
+    return window.UQUCore.api.tryPost(path, payload);
   }
 
   async function pushTranscriptToFirestore(courses, cgpa, totalHours, semesters) {

@@ -27,16 +27,16 @@
     _panelOpen: false,
 
     /* ── Init ──────────────────────────────────────── */
-    init() {
+    async init() {
       this._load();
-      this._generateSmartNotifs();
+      await this._generateSmartNotifs();
       this._updateBadge();
       this._injectPanel();
       this._checkEmergencyMode();
 
       // Refresh every 10 minutes
-      setInterval(() => {
-        this._generateSmartNotifs();
+      setInterval(async () => {
+        await this._generateSmartNotifs();
         this._updateBadge();
       }, 10 * 60 * 1000);
     },
@@ -55,130 +55,41 @@
       localStorage.setItem(K.NOTIFS, JSON.stringify(this._list));
     },
 
-    /* ── Generate Smart Notifications ───────────────── */
-    _generateSmartNotifs() {
+    /* ── Generate Smart Notifications (Backend Powered) ── */
+    async _generateSmartNotifs() {
       const academic = this._getAcademic();
-      const courses  = this._getCourses();
       const session  = window.UQUAuth?.getSession();
-      const today    = new Date();
-
       if (!session) return;
 
-      const newNotifs = [];
+      try {
+        const data = await window.UQUCore.api.post('/api/notifications/smart', academic || {});
+        const serverNotifs = data.notifications || [];
 
-      // 1. Welcome notification (first time)
-      if (!this._has('welcome')) {
-        newNotifs.push({
-          id:      'welcome',
-          type:    'success',
-          icon:    '🎉',
-          title:   `مرحباً بك ${session.name?.split(' ')[0] || ''}!`,
-          body:    'تم إنشاء حسابك بنجاح. ابدأ بإعداد بروفايلك الأكاديمي.',
-          time:    new Date().toISOString(),
-          read:    false,
-          link:    'profile.html',
-          linkText:'إعداد البروفايل',
-        });
-      }
-
-      // 2. Exam alerts
-      courses.forEach(course => {
-        if (!course.examDate || !course.name) return;
-        const examDate = new Date(course.examDate + 'T00:00:00');
-        const diffDays = Math.ceil((examDate - today) / 86400000);
-
-        if (diffDays < 0 || diffDays > 14) return;
-
-        const nid = `exam_${course.name}_${course.examDate}`;
-        if (this._has(nid)) return;
-
-        let type = 'info', icon = '📅', urgency = '';
-        if (diffDays <= 1) { type = 'danger'; icon = '🚨'; urgency = 'غداً!'; }
-        else if (diffDays <= 3) { type = 'warning'; icon = '⚠️'; urgency = `بعد ${diffDays} أيام`; }
-        else if (diffDays <= 7) { type = 'info'; icon = '📅'; urgency = `بعد ${diffDays} أيام`; }
-        else { type = 'info'; icon = '🗓️'; urgency = `بعد ${diffDays} يوماً`; }
-
-        newNotifs.push({
-          id:      nid,
-          type,
-          icon,
-          title:   `اختبار: ${course.name}`,
-          body:    `موعد الاختبار ${urgency} — ${course.examDate}`,
-          time:    new Date().toISOString(),
-          read:    false,
-          link:    'plan.html',
-          linkText:'عرض خطة المذاكرة',
-          examDate: course.examDate,
-          courseName: course.name,
-        });
-      });
-
-      // 3. Profile incomplete alert
-      if (!academic && !this._has('profile_incomplete')) {
-        newNotifs.push({
-          id:      'profile_incomplete',
-          type:    'warning',
-          icon:    '📋',
-          title:   'بروفايلك الأكاديمي غير مكتمل',
-          body:    'أكمل بروفايلك لتفعيل الخطط والتوصيات الذكية.',
-          time:    new Date().toISOString(),
-          read:    false,
-          link:    'profile.html',
-          linkText:'إكمال البروفايل',
-        });
-      }
-
-      // 4. GPA motivation
-      const gpa = parseFloat(academic?.gpaNow);
-      const target = parseFloat(academic?.gpaTarget);
-      if (gpa && target && !this._has('gpa_motivation')) {
-        const diff = target - gpa;
-        if (diff > 0 && diff <= 0.5) {
-          newNotifs.push({
-            id:      'gpa_motivation',
+        // 1. Local-only: Welcome notification (first time)
+        if (!this._has('welcome')) {
+          this._list.unshift({
+            id:      'welcome',
             type:    'success',
-            icon:    '🎯',
-            title:   'أنت قريب جداً من هدفك!',
-            body:    `معدلك الحالي ${gpa.toFixed(2)} والهدف ${target.toFixed(2)} — فرق ${diff.toFixed(2)} فقط!`,
+            icon:    '🎉',
+            title:   `مرحباً بك ${session.name?.split(' ')[0] || ''}!`,
+            body:    'تم إنشاء حسابك بنجاح. ابدأ بإعداد بروفايلك الأكاديمي.',
             time:    new Date().toISOString(),
             read:    false,
+            link:    'profile.html',
+            linkText:'إعداد البروفايل',
           });
         }
+
+        // 2. Add server-generated notifs (Exams, GPA, Daily Motivation)
+        serverNotifs.forEach(n => { if (!this._has(n.id)) this._list.unshift(n); });
+
+        // Keep max 50 notifications
+        this._list = this._list.slice(0, 50);
+        this._save();
+        this._updateBadge();
+      } catch (err) {
+        if (err.status !== 401) console.warn('[Notifs] fetch error:', err.message);
       }
-
-      // 5. Daily motivational (once per day)
-      const todayKey = `daily_${today.toDateString()}`;
-      if (!this._has(todayKey)) {
-        const messages = [
-          { title: 'صباح التميز 🌅', body: 'كل يوم هو فرصة جديدة للتفوق. ابدأ يومك بخطوة نحو هدفك.' },
-          { title: 'أنت تستطيع! 💪', body: 'الاجتهاد اليوم هو نجاح الغد. لا تستسلم أبداً.' },
-          { title: 'ذاكر بذكاء 🧠', body: 'استخدم خطة المذاكرة الذكية لتحسين كفاءتك الدراسية.' },
-          { title: 'تذكر هدفك 🎯', body: 'ضع هدفك نصب عينيك وامضِ قُدُماً. أنت أقرب مما تتصور.' },
-          { title: 'استراحة ضرورية 😴', body: 'النوم الكافي يحسن الذاكرة والتركيز. حافظ على صحتك.' },
-        ];
-        const msg = messages[today.getDay() % messages.length];
-        newNotifs.push({
-          id:   todayKey,
-          type: 'info',
-          icon: '✨',
-          title: msg.title,
-          body:  msg.body,
-          time:  new Date().toISOString(),
-          read:  false,
-          daily: true,
-        });
-      }
-
-      // Add new notifs
-      newNotifs.forEach(n => {
-        if (!this._has(n.id)) {
-          this._list.unshift(n);
-        }
-      });
-
-      // Keep max 50 notifications
-      this._list = this._list.slice(0, 50);
-      this._save();
     },
 
     /* ── Check if notification exists ───────────────── */
@@ -445,10 +356,15 @@
   window.UQUNotifications = UQUNotifications;
 
   /* ── Auto-init on DOM ready ──────────────────────── */
-  function tryInit() {
-    if (window.UQUAuth?.isLoggedIn()) {
-      UQUNotifications.init();
-    }
+  async function tryInit() {
+    if (!window.UQUAuth?.isLoggedIn()) return;
+    // انتظر جاهزية Firebase Auth قبل طلب /api/notifications/smart (تجنب 401)
+    try {
+      if (window.UQUAuth?.waitForAuthReady) {
+        await window.UQUAuth.waitForAuthReady(5000);
+      }
+    } catch (_) { /* proceed regardless */ }
+    UQUNotifications.init();
   }
 
   if (document.readyState === 'loading') {
@@ -460,7 +376,7 @@
   // Re-init on auth change
   window.addEventListener('uqu:auth', (e) => {
     if (e.detail?.type === 'login' || e.detail?.type === 'register') {
-      setTimeout(() => UQUNotifications.init(), 500);
+      tryInit();
     }
   });
 

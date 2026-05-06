@@ -45,6 +45,13 @@ class PomodoroSessionListResponse(BaseModel):
 
 class PomodoroStats(BaseModel):
     """Computed statistics for the user's Pomodoro history."""
+    todaySessions: int
+    todayMinutes: int
+    currentStreak: int
+    bestDayCount: int
+    weeklyChart: list[dict]
+    courseBreakdown: list[dict]
+    recentSessions: list[PomodoroSession]
     totalSessions: int
     totalMinutes: int
     totalHours: float

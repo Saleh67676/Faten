@@ -145,12 +145,13 @@ async def execute_tool(
         transcript = docs[0].to_dict()
         courses = transcript.get("courses", [])
 
-        # Grade point mapping (5-point scale)
+        # Grade point mapping (Saudi 5-point scale — synced with frontend core.js)
         GP = {
-            "A+": 5.0, "A": 4.75, "A-": 4.5,
-            "B+": 4.0, "B": 3.75, "B-": 3.5,
-            "C+": 3.25, "C": 3.0, "C-": 2.75,
-            "D+": 2.5, "D": 2.25, "F": 0.0
+            "A+": 5.00, "A": 4.75, "A-": 4.50,
+            "B+": 4.25, "B": 4.00, "B-": 3.75,
+            "C+": 3.50, "C": 3.00, "C-": 2.50,
+            "D+": 2.25, "D": 2.00, "D-": 1.75,
+            "F":  0.00,
         }
 
         scored = []
@@ -348,18 +349,20 @@ async def execute_tool(
                    .limit(1).get())
         t_docs = list(t_snaps)
 
-        # Grade point mapping (Saudi 5-point scale)
+        # Grade point mapping (Saudi 5-point scale — synced with frontend core.js)
         GP = {
-            "A+": 5.0, "A": 4.75, "A-": 4.5,
-            "B+": 4.0, "B": 3.75, "B-": 3.5,
-            "C+": 3.25, "C": 3.0, "C-": 2.75,
-            "D+": 2.5, "D": 2.25, "F": 0.0
+            "A+": 5.00, "A": 4.75, "A-": 4.50,
+            "B+": 4.25, "B": 4.00, "B-": 3.75,
+            "C+": 3.50, "C": 3.00, "C-": 2.50,
+            "D+": 2.25, "D": 2.00, "D-": 1.75,
+            "F":  0.00,
         }
         GRADE_LABELS = {
-            5.0: "A+", 4.75: "A", 4.5: "A-",
-            4.0: "B+", 3.75: "B", 3.5: "B-",
-            3.25: "C+", 3.0: "C", 2.75: "C-",
-            2.5: "D+", 2.25: "D", 0.0: "F"
+            5.00: "A+", 4.75: "A",  4.50: "A-",
+            4.25: "B+", 4.00: "B",  3.75: "B-",
+            3.50: "C+", 3.00: "C",  2.50: "C-",
+            2.25: "D+", 2.00: "D",  1.75: "D-",
+            0.00: "F",
         }
 
         # Calculate current quality points from transcript
@@ -568,10 +571,11 @@ async def execute_tool(
 
         # ── 3. Read transcript for weakness weighting ──
         GP = {
-            "A+": 5.0, "A": 4.75, "A-": 4.5,
-            "B+": 4.0, "B": 3.75, "B-": 3.5,
-            "C+": 3.25, "C": 3.0, "C-": 2.75,
-            "D+": 2.5, "D": 2.25, "F": 0.0,
+            "A+": 5.00, "A": 4.75, "A-": 4.50,
+            "B+": 4.25, "B": 4.00, "B-": 3.75,
+            "C+": 3.50, "C": 3.00, "C-": 2.50,
+            "D+": 2.25, "D": 2.00, "D-": 1.75,
+            "F":  0.00,
         }
 
         weak_subjects = set(analysis_data.get("weaknesses", []))
@@ -822,6 +826,108 @@ async def execute_tool(
             "weak_courses": weak_courses,
             "hard_courses": hard_courses,
             "message": summary,
+        }
+
+    # ── 14. Navigate to Page (client-only — frontend handles the redirect) ──
+    elif tool_name == "navigate_to_page":
+        pages = {
+            "dashboard": "dashboard.html",
+            "gpa":       "gpa.html",
+            "plan":      "plan.html",
+            "pomodoro":  "pomodoro.html",
+            "locations": "locations.html",
+            "profile":   "profile.html",
+            "chat":      "chat.html",
+        }
+        page = args.get("page", "dashboard")
+        url  = pages.get(page, "dashboard.html")
+        labels = {
+            "dashboard": "اللوحة", "gpa": "المعدل", "plan": "الخطة",
+            "pomodoro": "بومودورو", "locations": "القاعات",
+            "profile": "الملف الشخصي", "chat": "الدردشة",
+        }
+        return {
+            "success": True,
+            "client_only": True,
+            "url": url,
+            "page": page,
+            "message": f"جارٍ فتح صفحة {labels.get(page, page)}...",
+        }
+
+    # ── 15. Change Theme (client-only — frontend applies the theme) ──
+    elif tool_name == "change_theme":
+        theme = args.get("theme", "auto")
+        label = {"dark": "الوضع الليلي 🌙", "light": "الوضع النهاري ☀️", "auto": "التلقائي 🌗"}.get(theme, theme)
+        return {
+            "success": True,
+            "client_only": True,
+            "theme": theme,
+            "message": f"تم التغيير إلى {label}",
+        }
+
+    # ── 16. Get GPA History ──
+    elif tool_name == "get_gpa_history":
+        limit = int(args.get("limit", 20))
+        sem_snaps = (user_ref.collection("semesters")
+                     .order_by("createdAt", direction="ASCENDING")
+                     .limit(limit).get())
+        semesters = [{"id": d.id, **d.to_dict()} for d in sem_snaps]
+        return {"success": True, "semesters": semesters, "count": len(semesters)}
+
+    # ── 17. Add Semester GPA ──
+    elif tool_name == "add_semester_gpa":
+        semester = {
+            "name":      args["name"],
+            "gpa":       float(args["gpa"]),
+            "hours":     args.get("hours", 0),
+            "createdAt": now_iso,
+        }
+        _, ref = user_ref.collection("semesters").add(semester)
+        # Keep profile.currentGpa in sync
+        user_ref.update({
+            "profile.currentGpa": float(args["gpa"]),
+            "updatedAt": now_iso,
+        })
+        return {
+            "success": True,
+            "id": ref.id,
+            "message": f"تم تسجيل {args['name']} بمعدل {args['gpa']} / 5.00",
+        }
+
+    # ── 18. Update Course Grade ──
+    elif tool_name == "update_course_grade":
+        import re as _re
+
+        def _norm(s: str) -> str:
+            if not s:
+                return ""
+            s = _re.sub(r"[أإآ]", "ا", s)
+            s = _re.sub(r"ة", "ه", s)
+            return s.lower().strip()
+
+        snap = user_ref.get()
+        user_data = snap.to_dict() if snap.exists else {}
+        courses = user_data.get("profile", {}).get("courses", [])
+
+        course_name = args["course_name"]
+        grade       = float(args["grade"])
+
+        found = False
+        for c in courses:
+            if _norm(course_name) in _norm(c.get("name", "")) or \
+               _norm(c.get("name", "")) in _norm(course_name):
+                c["grade"]     = grade
+                c["updatedAt"] = now_iso
+                found = True
+                break
+
+        if not found:
+            return {"success": False, "message": f"لم أجد مادة باسم: {course_name}"}
+
+        user_ref.update({"profile.courses": courses, "updatedAt": now_iso})
+        return {
+            "success": True,
+            "message": f"تم تحديث درجة {course_name} إلى {grade} / 5.00",
         }
 
     # ── Unknown tool ──

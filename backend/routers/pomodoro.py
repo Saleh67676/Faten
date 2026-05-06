@@ -31,7 +31,8 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/pomodoro", tags=["Pomodoro"])
 
 
-@router.post("/log-session", response_model=PomodoroLogResponse)
+@router.post("/log", response_model=PomodoroLogResponse)
+@router.post("/log-session", response_model=PomodoroLogResponse, include_in_schema=False)
 async def log_completed_session(
     body: PomodoroSessionLog,
     user_id: str = Depends(verify_firebase_token),
@@ -64,15 +65,13 @@ async def log_completed_session(
         )
 
 
+from services.pomodoro import calculate_pomodoro_stats
+
 @router.get("/stats", response_model=PomodoroStats)
 async def get_pomodoro_stats(
     user_id: str = Depends(verify_firebase_token),
 ) -> PomodoroStats:
-    """Compute Pomodoro statistics: total sessions, hours, best streak.
-    
-    Mirrors the metrics collection from assets/achievements.js,
-    but computed server-side for authoritative stats.
-    """
+    """Compute comprehensive Pomodoro statistics for the dashboard."""
     db = get_db()
     try:
         sessions_ref = (
@@ -88,41 +87,15 @@ async def get_pomodoro_stats(
                 "duration": doc.get("duration", 0),
                 "type": doc.get("type", "focus"),
                 "courseName": doc.get("courseName", ""),
+                "courseCode": doc.get("courseCode", ""),
+                "completedAt": doc.get("completedAt", ""),
             }
             for doc in docs
         ]
 
-        # Filter focus sessions only
-        focus_sessions = [s for s in sessions if s.get("type") == "focus"]
-
-        # Compute metrics
-        total_sessions = len(focus_sessions)
-        total_minutes = sum(s.get("duration", 0) for s in focus_sessions)
-        total_hours = total_minutes / 60 if total_minutes else 0
-
-        # Compute best streak
-        if focus_sessions:
-            dates_set = sorted(set(s["date"] for s in focus_sessions if s.get("date")))
-            streak = 1
-            best_streak = 1
-            for i in range(1, len(dates_set)):
-                prev_date = datetime.strptime(dates_set[i - 1], "%Y-%m-%d")
-                curr_date = datetime.strptime(dates_set[i], "%Y-%m-%d")
-                days_diff = (curr_date - prev_date).days
-                if days_diff == 1:
-                    streak += 1
-                    best_streak = max(best_streak, streak)
-                else:
-                    streak = 1
-        else:
-            best_streak = 0
-
-        return PomodoroStats(
-            totalSessions=total_sessions,
-            totalMinutes=total_minutes,
-            totalHours=round(total_hours, 2),
-            bestStreak=best_streak,
-        )
+        stats_data = calculate_pomodoro_stats(sessions)
+        return PomodoroStats(**stats_data)
+        
     except Exception as e:
         logger.error(f"Failed to compute pomodoro stats: {e}")
         raise HTTPException(

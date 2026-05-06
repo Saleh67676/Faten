@@ -3,8 +3,8 @@
  * Strategy: Cache-First for static, Network-First for API
  */
 
-const CACHE_STATIC  = 'uqu-static-v27';
-const CACHE_DYNAMIC = 'uqu-dynamic-v27';
+const CACHE_STATIC  = 'uqu-static-v31';
+const CACHE_DYNAMIC = 'uqu-dynamic-v31';
 
 const STATIC_ASSETS = [
   './',
@@ -47,8 +47,15 @@ const STATIC_ASSETS = [
   'https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap'
 ];
 
+const IS_DEV_INSTALL = self.location.hostname === 'localhost' || self.location.hostname === '127.0.0.1';
+
 // ── Install ──
 self.addEventListener('install', e => {
+  if (IS_DEV_INSTALL) {
+    // Dev: skip pre-caching so we never serve stale assets
+    e.waitUntil(self.skipWaiting());
+    return;
+  }
   e.waitUntil(
     caches.open(CACHE_STATIC)
       .then(cache => cache.addAll(STATIC_ASSETS).catch(() => {}))
@@ -58,13 +65,18 @@ self.addEventListener('install', e => {
 
 // ── Activate ──
 self.addEventListener('activate', e => {
-  const keep = [CACHE_STATIC, CACHE_DYNAMIC];
+  const keep = IS_DEV_INSTALL ? [] : [CACHE_STATIC, CACHE_DYNAMIC];
   e.waitUntil(
     caches.keys()
       .then(keys => Promise.all(keys.filter(k => !keep.includes(k)).map(k => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
+
+// ── Dev mode: skip caching entirely on localhost so changes are picked up
+//    immediately. The SW still installs (so prod behavior is testable) but
+//    becomes a pass-through.
+const IS_DEV = self.location.hostname === 'localhost' || self.location.hostname === '127.0.0.1';
 
 // ── Fetch ──
 self.addEventListener('fetch', e => {
@@ -73,6 +85,12 @@ self.addEventListener('fetch', e => {
 
   // ── NEVER cache non-GET requests (POST, PUT, DELETE, PATCH) ──
   if (request.method !== 'GET') return;
+
+  // ── Dev: always go to network with cache-busting, never serve stale code ──
+  if (IS_DEV) {
+    e.respondWith(fetch(request, { cache: 'no-store' }).catch(() => caches.match(request).then(r => r || new Response('Offline', { status: 503 }))));
+    return;
+  }
 
   // API calls → network only (no cache)
   if (

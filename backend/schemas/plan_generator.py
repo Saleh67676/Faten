@@ -7,6 +7,7 @@ assets/plan-generator.js (window.GeneratorEngine.generateAIPlan).
 Field names match the JS exactly so the existing UI is not broken.
 """
 
+from typing import Any
 from pydantic import BaseModel, Field
 
 
@@ -85,3 +86,16 @@ class PlanGenerationResponse(BaseModel):
     """Exact shape returned by the original JS generateAIPlan(state)."""
     reasoning: str
     tasks: list[PlanTask]
+
+class FallbackPlanRequest(BaseModel):
+    slots: list[dict[str, Any]]
+    courses: list[dict[str, Any]]
+    sessionMin: int = 60
+    weeks: int = 1
+    planStart: str
+
+class FallbackPlanResponse(BaseModel):
+    success: bool
+    plan: list[dict[str, Any]] = []
+    warnings: list[str] = []
+    message: str = ""

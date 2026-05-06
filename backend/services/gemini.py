@@ -26,16 +26,33 @@ GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 
 
 def _clean_json_text(text: str) -> str:
-    """Strip markdown ```json fences if present (mirrors ai-service.js cleanup)."""
+    """Robust JSON extraction:
+    1. Strip leading/trailing whitespace
+    2. Strip surrounding markdown fences (```json ... ``` or ``` ... ```)
+    3. If the model added prose around the JSON, slice from first { or [ to
+       the matching last } or ] (whichever brackets the structure uses).
+    """
     text = text.strip()
     if text.startswith("```json"):
         text = text[len("```json"):].strip()
-        if text.endswith("```"):
-            text = text[: -len("```")].strip()
     elif text.startswith("```"):
         text = text[len("```"):].strip()
-        if text.endswith("```"):
-            text = text[: -len("```")].strip()
+    if text.endswith("```"):
+        text = text[: -len("```")].strip()
+
+    # If there's prose wrapping a JSON object/array, extract just the JSON.
+    if text and text[0] not in "{[":
+        # Find the first { or [ and slice from there.
+        first_brace = text.find("{")
+        first_bracket = text.find("[")
+        candidates = [c for c in (first_brace, first_bracket) if c != -1]
+        if candidates:
+            start = min(candidates)
+            opener = text[start]
+            closer = "}" if opener == "{" else "]"
+            end = text.rfind(closer)
+            if end > start:
+                text = text[start : end + 1]
     return text
 
 

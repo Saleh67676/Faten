@@ -122,45 +122,61 @@ def _collect_metrics(db, user_id: str) -> dict:
         pass
     
     try:
-        # Profile data
+        # Profile data — Firestore stores flat fields under "profile", not nested basic/goals
         user_doc = db.collection("users").document(user_id).get()
         if user_doc.exists:
-            profile = user_doc.get("profile") or {}
-            goals = profile.get("goals") or {}
-            basic = profile.get("basic") or {}
+            profile = user_doc.to_dict().get("profile") or {}
             courses = profile.get("courses") or []
-            
+
             metrics["coursesCount"] = len(courses)
-            metrics["hasTarget"] = bool(goals.get("targetGpa"))
+            metrics["hasTarget"] = bool(profile.get("targetGpa"))
             metrics["profileComplete"] = bool(
-                basic.get("name") and basic.get("major") and 
-                basic.get("level") and goals.get("currentGpa") and len(courses) >= 1
+                profile.get("name") and profile.get("major") and
+                profile.get("level") and profile.get("currentGpa") and len(courses) >= 1
             )
-            
-            if goals.get("currentGpa") and goals.get("initialGpa"):
+
+            if profile.get("currentGpa") and profile.get("initialGpa"):
                 try:
-                    metrics["gpaImprovement"] = float(goals.get("currentGpa")) - float(goals.get("initialGpa"))
-                except:
+                    metrics["gpaImprovement"] = float(profile["currentGpa"]) - float(profile["initialGpa"])
+                except Exception:
                     pass
-    except:
+    except Exception:
         pass
-    
+
     try:
-        # Plan data
-        user_doc = db.collection("users").document(user_id).get()
-        if user_doc.exists:
-            plan = user_doc.get("plan") or {}
-            plan_list = plan.get("plan") or []
+        # Plan data — stored in study_plans sub-collection, not as a user doc field
+        plan_docs = (
+            db.collection("users").document(user_id)
+            .collection("study_plans")
+            .where("active", "==", True)
+            .limit(1)
+            .stream()
+        )
+        for plan_doc in plan_docs:
+            plan_data = plan_doc.to_dict() or {}
+            plan_list = plan_data.get("plan") or plan_data.get("tasks") or []
             metrics["hasPlan"] = len(plan_list) > 0
-            metrics["completedTasks"] = sum(1 for t in plan_list if t.get("completed"))
-    except:
+            metrics["completedTasks"] = sum(
+                1 for t in plan_list if t.get("done") or t.get("completed")
+            )
+            break
+    except Exception:
         pass
-    
+
     try:
-        # Chat data
-        chat_docs = db.collection("users").document(user_id).collection("chat_history").stream()
-        metrics["chatMessages"] = sum(1 for doc in chat_docs if doc.get("role") == "user")
-    except:
+        # Chat data — messages are embedded in chat_history documents under "messages" array
+        chat_docs = (
+            db.collection("users").document(user_id)
+            .collection("chat_history")
+            .stream()
+        )
+        msg_count = 0
+        for conv_doc in chat_docs:
+            conv_data = conv_doc.to_dict() or {}
+            msgs = conv_data.get("messages") or []
+            msg_count += sum(1 for m in msgs if m.get("role") == "user")
+        metrics["chatMessages"] = msg_count
+    except Exception:
         pass
     
     return metrics
@@ -266,13 +282,16 @@ async def check_badges(
     db = get_db()
     try:
         metrics = _collect_metrics(db, user_id)
-        
-        # Get current achievements
+
+        # Get current achievements — use to_dict() so we can call dict.get() with defaults.
+        # DocumentSnapshot.get(field, default) is NOT supported by the Firestore Python SDK;
+        # calling it with two args raises TypeError.
         ref = db.collection("users").document(user_id).collection("achievements").document("state")
         doc = ref.get()
-        current_xp = doc.get("xp") if doc.exists else 0
-        unlocked = doc.get("unlockedBadges", []) if doc.exists else []
-        
+        data = doc.to_dict() or {} if doc.exists else {}
+        current_xp = data.get("xp") or 0
+        unlocked = list(data.get("unlockedBadges") or [])
+
         new_badges = []
         for badge in BADGES:
             if badge["id"] in unlocked:
@@ -282,9 +301,9 @@ async def check_badges(
                     new_badges.append(badge["id"])
                     unlocked.append(badge["id"])
                     current_xp += XP_REWARDS["badgeUnlocked"]
-            except:
+            except Exception:
                 pass
-        
+
         # Persist updated state
         if new_badges:
             ref.set({
@@ -292,7 +311,7 @@ async def check_badges(
                 "xp": current_xp,
                 "updatedAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
             }, merge=True)
-        
+
         return {
             "newBadges": new_badges,
             "totalXP": current_xp,
@@ -317,16 +336,17 @@ async def add_xp(
         amount = XP_REWARDS.get(body.reason, body.amount or 0)
         if amount <= 0:
             raise ValueError("Invalid XP amount")
-        
+
         ref = db.collection("users").document(user_id).collection("achievements").document("state")
         doc = ref.get()
-        current_xp = (doc.get("xp") if doc.exists else 0) + amount
-        
+        data = doc.to_dict() or {} if doc.exists else {}
+        current_xp = (data.get("xp") or 0) + amount
+
         ref.set({
             "xp": current_xp,
             "updatedAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         }, merge=True)
-        
+
         return {
             "success": True,
             "xpAdded": amount,

@@ -20,6 +20,7 @@ from auth.dependencies import get_current_user_optional
 from db.firestore import get_db
 from agent.prompts import build_system_prompt
 from agent.loop import run_agent_loop
+from services.fallback_brain import get_fallback_response
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Chat"])
@@ -126,7 +127,22 @@ async def _chat_logic(request: ChatRequest, user_id: str):
         if not request.messages:
             raise HTTPException(status_code=400, detail="messages required")
 
-        # ── Build messages ──
+        # ── Fallback Brain: ONLY for trivial greetings/thanks (NOT for academic Qs) ──
+        # Previously, this brain intercepted GPA/plan/location questions with hardcoded
+        # canned responses, which broke the real AI. Now restricted to pure greetings.
+        last_msg = request.messages[-1].content if request.messages else ""
+        fallback = get_fallback_response(last_msg, ctx.get("user_data"))
+
+        if fallback:
+            logger.info(f"Fallback brain (greeting/thanks) matched: {last_msg[:30]}...")
+            return ChatResponse(
+                success=True,
+                message=fallback["message"],
+                actions=fallback["actions"],
+                conversationId=request.conversationId or f"conv_{int(time.time() * 1000)}"
+            )
+
+        # ── Step 2: Build messages & Run Agent ──
         system_prompt = build_system_prompt(
             ctx["user_data"],
             ctx["transcript"],
@@ -139,9 +155,37 @@ async def _chat_logic(request: ChatRequest, user_id: str):
         ]
 
         # ── Run agent ──
-        result = await run_agent_loop(full_messages, user_id, db)
-        content = result["content"]
-        actions_log = result["actions_log"]
+        try:
+            result = await run_agent_loop(full_messages, user_id, db)
+            content = result["content"]
+            actions_log = result["actions_log"]
+        except Exception as agent_err:
+            err_str = str(agent_err)
+            logger.error(f"[chat] Agent loop failed: {err_str}", exc_info=True)
+
+            # Surface the real failure type to the user so they can fix it
+            error_msg = "عذراً، واجه المحرك الذكي صعوبة في معالجة طلبك حالياً."
+            low = err_str.lower()
+            if "401" in err_str or "unauthorized" in low or "invalid" in low and "key" in low:
+                error_msg = "⚠️ مفتاح NVIDIA API غير صالح أو منتهي — راجع backend/.env"
+            elif "404" in err_str or "not found" in low or "model" in low:
+                error_msg = f"⚠️ موديل الذكاء غير متاح ({err_str[:80]}). تحقق من NVIDIA_MODEL في backend/.env"
+            elif "429" in err_str or "rate" in low:
+                error_msg = "⚠️ تم تجاوز الحد المسموح من الطلبات — جرّب مرة أخرى بعد دقيقة."
+            elif "timeout" in low or "timed out" in low:
+                error_msg = "⚠️ المحرك تأخر في الرد — حاول مرة أخرى."
+            elif "connection" in low or "network" in low:
+                error_msg = "⚠️ تعذّر الاتصال بمزود الذكاء (NVIDIA NIM) — تحقق من اتصال السيرفر بالإنترنت."
+            else:
+                # Show the actual error tail so user/dev can debug
+                error_msg = f"⚠️ خطأ في المحرك الذكي: {err_str[:120]}"
+
+            return ChatResponse(
+                success=True,
+                message=error_msg,
+                actions=[],
+                conversationId=request.conversationId or f"conv_{int(time.time() * 1000)}"
+            )
 
         # ── Persist chat history ──
         conv_id = request.conversationId or f"conv_{int(time.time() * 1000)}"

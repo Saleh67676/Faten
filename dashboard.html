@@ -135,7 +135,7 @@
               </div>
               <span class="insight-chip" id="gpa-gap-chip" style="display:none;"></span>
             </header>
-            <div class="chart-placeholder" style="flex:1;width:100%;position:relative;min-height:200px;"></div>
+            <div id="dashGpaChart" class="chart-placeholder" style="flex:1;width:100%;position:relative;min-height:200px;"></div>
           </div>
 
           <aside class="card animate-block delay-3 dash-card-interactive" data-modal="courseProgress" data-ripple>
@@ -510,14 +510,25 @@
   <script>
   // ── Exam Countdown & Insights for Dashboard ──────────────────
   function initDashboardEnhancements() {
-    const _p = JSON.parse(localStorage.getItem('uqu_profile_v2') || 'null');
-    const courses = (_p && _p.courses) ? _p.courses : [];
     const academic = JSON.parse(localStorage.getItem('uqu_profile_v2') || 'null');
+    if (!academic) return;
+    const courses = academic.courses || [];
+    const examsArr = academic.exams || [];
     const today = new Date();
 
     // ── Exam Countdown ──────────────────────────────────────
-    const upcoming = courses
+    // Support both patterns: course.examDate AND profile.exams[]
+    const fromCourses = courses
       .filter(c => c.examDate)
+      .map(c => ({ name: c.name, code: c.code, difficulty: c.difficulty, examDate: c.examDate }));
+    const fromExams = examsArr
+      .filter(e => e.date)
+      .map(e => {
+        const c = courses.find(x => x.code === e.course || x.name === e.course) || {};
+        return { name: e.title || c.name || e.course, code: e.course || c.code, difficulty: c.difficulty, examDate: e.date };
+      });
+
+    const upcoming = [...fromCourses, ...fromExams]
       .map(c => {
         const exam = new Date(c.examDate + 'T00:00:00');
         const diff = Math.ceil((exam - today) / 86400000);
@@ -560,11 +571,13 @@
 
     if (!academic || !insightsSection || !insightsGrid) return;
 
+    const goals = academic.goals || {};
     const insights = [];
-    const gpa    = parseFloat(academic.gpaNow);
-    const target = parseFloat(academic.gpaTarget);
-    const earned = parseInt(academic.earnedHours);
-    const plan   = parseInt(academic.planHours);
+    const gpa    = parseFloat(goals.currentGpa ?? academic.gpaNow);
+    const target = parseFloat(goals.targetGpa ?? academic.gpaTarget);
+    const earned = parseInt(goals.creditsCompleted ?? goals.earnedHours ?? academic.earnedHours);
+    const plan   = parseInt((goals.creditsCompleted || 0) + (goals.creditsRemaining || 0))
+                   || parseInt(goals.planHours ?? academic.planHours);
 
     if (gpa && target) {
       const diff = target - gpa;
@@ -589,7 +602,7 @@
       }
     }
 
-    const timeLabel = { morning:'الصباح', noon:'الظهر', evening:'المساء', night:'الليل' }[academic.time];
+    const timeLabel = { morning:'الصباح', noon:'الظهر', evening:'المساء', night:'الليل' }[goals.preferredStudyTime || academic.time];
     if (timeLabel) {
       insights.push({ icon: '⏰', text: `وقت ذروتك الدراسي: ${timeLabel}. خطط جلساتك وفقاً لذلك.`, color: 'var(--fg)' });
     }
@@ -1441,23 +1454,28 @@
     }
 
     /* ── 11. Achievements Modal ── */
-    function showAchievementsModal(){
+    async function showAchievementsModal(){
       var A=window.UQUAchievements;
-      var data=A?A.loadAchievements():null;
+      var data=null;
+      try { data = A ? await A.getData() : null; } catch(_) {}
       var streakData=null;
       try{streakData=JSON.parse(localStorage.getItem('uqu_streak')||'null');}catch(e){}
       var streak=streakData?(streakData.current||streakData.streak||0):0;
 
       var xp=(data&&data.xp)||0;
-      var lvInfo=A?A.getLevel(xp):null;
-      var level=lvInfo?lvInfo.level:1;
-      var levelTitle=lvInfo?lvInfo.title:'';
-      var xpInLevel=lvInfo?lvInfo.xpInLevel:xp;
-      var xpForNext=lvInfo?lvInfo.xpForNext:100;
+      var level=(data&&data.level)||1;
+      var levelTitle=(data&&data.levelTitle)||'مبتدئ';
+      var xpInLevel=(data&&data.xpInLevel)||xp;
+      var xpForNext=(data&&data.xpForNext)||100;
       var xpPct=xpForNext?Math.min(Math.round((xpInLevel/xpForNext)*100),100):0;
-      var unlockedBadges=(data&&data.unlockedBadges)||[];
-      var allBadges=(A&&A.BADGES)?Object.values(A.BADGES):[];
-      var lockedBadges=allBadges.filter(function(b){ return unlockedBadges.indexOf(b.id)===-1; });
+
+      var allBadges=(data&&(data.badges||data.achievements))||[];
+      // Fallback to UQUAuth if backend gave nothing
+      if(!allBadges.length && window.UQUAuth?.getAchievements) {
+        allBadges = window.UQUAuth.getAchievements() || [];
+      }
+      var unlockedBadges=allBadges.filter(function(b){ return b.earned; });
+      var lockedBadges=allBadges.filter(function(b){ return !b.earned; });
 
       var lColors=['','var(--muted)','var(--success)','var(--accent)','var(--warning)','var(--danger)'];
       var lC=lColors[Math.min(level,lColors.length-1)]||'var(--accent)';
@@ -1471,27 +1489,24 @@
 
       html+='<div style="padding:14px 16px;background:var(--surface-2);border-radius:var(--r-md);margin-bottom:18px;">';
       html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">';
-      html+='<span style="font-size:.84rem;font-weight:800;">'+levelTitle+' <span style="color:var(--muted);font-weight:500;font-size:.76rem;">← '+( lvInfo&&lvInfo.nextTitle ? lvInfo.nextTitle : '')+' المستوى '+(level+1)+'</span></span>';
+      html+='<span style="font-size:.84rem;font-weight:800;">'+levelTitle+' <span style="color:var(--muted);font-weight:500;font-size:.76rem;">← المستوى '+(level+1)+'</span></span>';
       html+='<span style="font-size:.78rem;font-weight:700;color:'+lC+';">'+xpPct+'%</span></div>';
       html+='<div style="height:10px;background:var(--border);border-radius:5px;overflow:hidden;"><div style="height:100%;width:'+xpPct+'%;background:linear-gradient(90deg,'+lC+',var(--accent-2));border-radius:5px;transition:width .6s;"></div></div>';
       html+='<div style="margin-top:5px;font-size:.72rem;color:var(--muted);">'+xpInLevel+' / '+xpForNext+' XP للمستوى التالي</div>';
       html+='</div>';
 
-      if(unlockedBadges.length > 0 && allBadges.length > 0){
-        var unlockedFull=allBadges.filter(function(b){ return unlockedBadges.indexOf(b.id)!==-1; });
-        if(unlockedFull.length > 0){
-          html+='<h4 style="font-size:.88rem;font-weight:800;color:var(--success);margin:0 0 10px;">✅ إنجازات مفتوحة ('+unlockedFull.length+')</h4>';
-          html+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;margin-bottom:16px;">';
-          unlockedFull.forEach(function(b){
-            html+='<div style="padding:10px 8px;background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.2);border-radius:var(--r-sm);text-align:center;">';
-            html+='<div style="font-size:1.4rem;margin-bottom:4px;">'+(b.icon||'🏅')+'</div>';
-            html+='<div style="font-size:.74rem;font-weight:700;color:var(--fg);">'+(b.name||b.title||'')+'</div>';
-            if(b.xp) html+='<div style="font-size:.66rem;color:var(--success);font-weight:700;margin-top:2px;">+'+b.xp+' XP</div>';
-            html+='</div>';
-          });
+      if(unlockedBadges.length > 0){
+        html+='<h4 style="font-size:.88rem;font-weight:800;color:var(--success);margin:0 0 10px;">✅ إنجازات مفتوحة ('+unlockedBadges.length+')</h4>';
+        html+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;margin-bottom:16px;">';
+        unlockedBadges.forEach(function(b){
+          html+='<div style="padding:10px 8px;background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.2);border-radius:var(--r-sm);text-align:center;">';
+          html+='<div style="font-size:1.4rem;margin-bottom:4px;">'+(b.icon||'🏅')+'</div>';
+          html+='<div style="font-size:.74rem;font-weight:700;color:var(--fg);">'+(b.name||b.title||b.id||'')+'</div>';
+          if(b.xp) html+='<div style="font-size:.66rem;color:var(--success);font-weight:700;margin-top:2px;">+'+b.xp+' XP</div>';
           html+='</div>';
-        }
-      } else if(unlockedBadges.length===0){
+        });
+        html+='</div>';
+      } else {
         html+='<div style="text-align:center;padding:16px;opacity:.6;font-size:.84rem;color:var(--muted);">📭 لم تُفتح أي إنجازات بعد — ابدأ بالدراسة لكسب الأولى!</div>';
       }
 
@@ -1501,8 +1516,8 @@
         lockedBadges.slice(0,5).forEach(function(b){
           html+='<div style="padding:8px 12px;background:var(--surface-2);border-radius:var(--r-sm);opacity:.65;display:flex;align-items:center;gap:10px;">';
           html+='<div style="font-size:1.1rem;">'+(b.icon||'🔒')+'</div>';
-          html+='<div style="flex:1;min-width:0;"><div style="font-size:.8rem;font-weight:600;">'+(b.name||b.title||'')+'</div>';
-          if(b.description) html+='<div style="font-size:.72rem;color:var(--muted);">'+b.description+'</div>';
+          html+='<div style="flex:1;min-width:0;"><div style="font-size:.8rem;font-weight:600;">'+(b.name||b.title||b.id||'')+'</div>';
+          if(b.desc||b.description) html+='<div style="font-size:.72rem;color:var(--muted);">'+(b.desc||b.description)+'</div>';
           html+='</div>';
           if(b.xp) html+='<div style="font-size:.72rem;font-weight:700;color:var(--accent);flex-shrink:0;">+'+b.xp+' XP</div>';
           html+='</div>';

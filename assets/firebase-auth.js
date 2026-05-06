@@ -44,53 +44,19 @@
      ════════════════════════════════════════════════════════════════ */
 
   function _hookIntoUQUAuth() {
-    // Listen for UQU login/register/logout events
+    // auth.js ALREADY signs in via firebase.auth().signInWithEmailAndPassword
+    // with the user's actual password during register()/login(). This bridge
+    // used to try to sign in *again* with a derived password (UQU_<id>_<hash>),
+    // which always failed and silently fell back to anonymous auth — that
+    // wiped the real session, gave the user an anonymous UID, and Firestore
+    // rules then blocked every read/write because the authed UID no longer
+    // matched the document path. So we just listen for logout to clean up.
     window.addEventListener('uqu:auth', async (e) => {
-      const { type, user } = e.detail || {};
-
-      if (type === 'login' || type === 'register') {
-        await _syncFirebaseSignIn(user);
-      } else if (type === 'logout') {
+      const { type } = e.detail || {};
+      if (type === 'logout') {
         await _syncFirebaseSignOut();
       }
     });
-  }
-
-  /* ════════════════════════════════════════════════════════════════
-     3. SIGN IN WITH FIREBASE (mirror of UQU auth)
-     ════════════════════════════════════════════════════════════════ */
-
-  async function _syncFirebaseSignIn(uquUser) {
-    if (!_fbAuth || !uquUser?.email) return;
-
-    // Already signed in as same user → skip
-    if (_fbUser && _fbUser.email === uquUser.email) return;
-
-    try {
-      // Try to sign in — if fails, create new account
-      await _fbAuth.signInWithEmailAndPassword(uquUser.email, _derivePassword(uquUser));
-    } catch (signInErr) {
-      if (signInErr.code === 'auth/user-not-found' || signInErr.code === 'auth/wrong-password') {
-        try {
-          // Create Firebase account mirroring UQU account
-          await _fbAuth.createUserWithEmailAndPassword(uquUser.email, _derivePassword(uquUser));
-
-          // Update display name
-          if (_fbAuth.currentUser && uquUser.name) {
-            await _fbAuth.currentUser.updateProfile({ displayName: uquUser.name });
-          }
-        } catch (createErr) {
-          console.error('[FirebaseAuth] Create account failed:', createErr.code);
-          // Use anonymous auth as fallback
-          await _anonymousFallback();
-        }
-      } else if (signInErr.code === 'auth/invalid-email') {
-        await _anonymousFallback();
-      } else {
-        console.error('[FirebaseAuth] Sign-in error:', signInErr.code);
-        await _anonymousFallback();
-      }
-    }
   }
 
   async function _syncFirebaseSignOut() {
@@ -120,35 +86,8 @@
     }
   }
 
-  async function _anonymousFallback() {
-    if (!_fbAuth) return;
-    try {
-      // Use anonymous auth so Firestore security rules still work
-      if (!_fbUser) {
-        await _fbAuth.signInAnonymously();
-      }
-    } catch (err) {
-      console.error('[FirebaseAuth] Anonymous auth failed:', err.code);
-    }
-  }
-
   /* ════════════════════════════════════════════════════════════════
-     4. DERIVE FIREBASE PASSWORD FROM UQU SESSION
-     (Firebase needs a password — we derive it from stored hash)
-     ════════════════════════════════════════════════════════════════ */
-
-  function _derivePassword(uquUser) {
-    // Use a stable identifier — NOT the plaintext password (we never have that)
-    // Instead use: UQU_ + userId + first 8 chars of stored hash
-    const userId = uquUser.id || uquUser.userId || '';
-    const hash   = uquUser.passwordHash || '';
-    const base   = `UQU_${userId}_${hash.slice(0, 8)}`;
-    // Ensure min 6 chars
-    return base.length >= 6 ? base : `UQU_${userId}_default`;
-  }
-
-  /* ════════════════════════════════════════════════════════════════
-     5. PUBLIC API
+     PUBLIC API
      ════════════════════════════════════════════════════════════════ */
 
   /**

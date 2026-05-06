@@ -80,7 +80,7 @@
         const formData = new FormData();
         formData.append('file', transcriptFile);
 
-        const res = await fetch('http://localhost:8000/api/onboarding/analyze-transcript', {
+        const res = await fetch(`${window.AGENT_BASE_URL || 'http://localhost:8000'}/api/onboarding/analyze-transcript`, {
           method: 'POST',
           headers,
           body: formData
@@ -99,7 +99,7 @@
              const tbForm = new FormData();
              tbForm.append('file', tbFile);
              
-             const tbRes = await fetch('http://localhost:8000/api/onboarding/analyze-timetable', {
+             const tbRes = await fetch(`${window.AGENT_BASE_URL || 'http://localhost:8000'}/api/onboarding/analyze-timetable`, {
                 method: 'POST',
                 headers,
                 body: tbForm
@@ -263,6 +263,7 @@
           }
         };
   
+        // ── Update localStorage cache (fast local read) ──
         const profile = JSON.parse(localStorage.getItem('uqu_profile_v2') || '{}');
         const merged = { ...profile, ...updates };
         merged.goals = { ...(profile.goals || {}), ...updates.goals };
@@ -273,34 +274,36 @@
              localStorage.setItem('uqu_semesters', JSON.stringify(extractedData.historical_semesters));
         }
 
-        if (window.FirebaseDB && window.FirebaseAuth?.getUid()) {
-           const db = firebase.firestore();
-           const uid = window.FirebaseAuth.getUid();
-           const batch = db.batch();
-           const userRef = db.collection('users').doc(uid);
+        // ── Persist to Firestore via authenticated backend endpoint ──
+        const token = window.FirebaseAuth?.getIdToken
+           ? await window.FirebaseAuth.getIdToken()
+           : (window.FirebaseDB?.getIdToken ? await window.FirebaseDB.getIdToken() : null);
 
-           batch.set(userRef, {
-             profile: {
-               currentGpa: merged.goals.currentGpa,
-               earnedHours: merged.goals.earnedHours,
-               targetGpa: merged.goals.targetGpa,
-               planHours: merged.goals.planHours,
-               courses: merged.courses,
-               university: extractedData.university || 'أم القرى'
+        if (token) {
+           const baseUrl = window.AGENT_BASE_URL || 'http://localhost:8000';
+           const saveRes = await fetch(`${baseUrl}/api/onboarding/save-profile`, {
+             method: 'POST',
+             headers: {
+               'Content-Type': 'application/json',
+               'Authorization': `Bearer ${token}`
              },
-             study_preferences: merged.preferences,
-             timetable: timetableData ? timetableData.schedule : [],
-             updatedAt: new Date().toISOString()
-           }, { merge: true });
+             body: JSON.stringify({
+               goals: updates.goals,
+               courses: updates.courses,
+               preferences: updates.preferences,
+               timetable: timetableData ? timetableData.schedule : [],
+               historical_semesters: extractedData.historical_semesters || [],
+               university: extractedData.university || 'أم القرى'
+             })
+           });
 
-           if (extractedData.historical_semesters) {
-               extractedData.historical_semesters.forEach((sem, i) => {
-                   let semRef = userRef.collection('semesters').doc('term_' + i);
-                   batch.set(semRef, sem);
-               });
+           if (!saveRes.ok) {
+             const errData = await saveRes.json().catch(() => ({}));
+             console.warn('[Onboarding] Backend save warning:', errData.detail || saveRes.status);
+             // Don't block the UI — localStorage is already saved as fallback
            }
-
-           await batch.commit();
+        } else {
+           console.warn('[Onboarding] No auth token — data saved locally only');
         }
   
         document.body.classList.remove('onboarding-active');

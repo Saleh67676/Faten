@@ -58,3 +58,18 @@ class SuggestSessionsRequest(BaseModel):
 
 class SuggestSessionsResponse(BaseModel):
     suggestions: list[dict[str, Any]] = Field(default_factory=list)
+
+
+# ── Smart Plan Generator ──
+
+class SmartPlanRequest(BaseModel):
+    profile: dict[str, Any] | None = None
+    slots: list[dict[str, Any]] = Field(default_factory=list)
+    options: dict[str, Any] = Field(default_factory=dict)
+    today: str | None = None
+
+
+class SmartPlanResponse(BaseModel):
+    plan: list[dict[str, Any]] = Field(default_factory=list)
+    warnings: list[dict[str, Any]] = Field(default_factory=list)
+    stats: dict[str, Any] = Field(default_factory=dict)

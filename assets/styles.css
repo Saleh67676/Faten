@@ -4236,10 +4236,12 @@ article.card .stat {
 }
 
 /* ── Animate-in refined ── */
-.animate-block {
-  opacity: 0;
-  transform: translateY(20px);
-  transition: opacity .55s cubic-bezier(0.4,0,0.2,1), transform .55s cubic-bezier(0.4,0,0.2,1);
+@media (prefers-reduced-motion: no-preference) {
+  .animate-block {
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity .55s cubic-bezier(0.4,0,0.2,1), transform .55s cubic-bezier(0.4,0,0.2,1);
+  }
 }
 .animate-in {
   opacity: 1 !important;
@@ -4677,8 +4679,10 @@ textarea:focus {
 }
 
 /* ── Smooth Page Transition ──────────────────────────────────── */
-.app-main {
-  animation: pageEnter .4s ease-out;
+@media (prefers-reduced-motion: no-preference) {
+  .app-main {
+    animation: pageEnter .4s ease-out;
+  }
 }
 
 @keyframes pageEnter {

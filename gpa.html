@@ -88,7 +88,7 @@
                 </div>
                 <div>
                   <label class="lbl" for="totalPlanHours">إجمالي ساعات الخطة</label>
-                  <input type="number" id="totalPlanHours" value="130" placeholder="مثلاً 130" min="0" />
+                  <input type="number" id="totalPlanHours" placeholder="مثلاً 187" min="0" />
                 </div>
               </div>
             </div>
@@ -309,7 +309,7 @@
     function calcSemGpa(courses) {
       var pts = 0, hrs = 0;
       courses.forEach(function(c) {
-        var cr = parseFloat(c.credits) || 0;
+        var cr = parseFloat(c.credits ?? c.creditHours ?? c.hours) || 0;
         var gp = GRADE_POINTS[c.grade] != null ? GRADE_POINTS[c.grade] : 0;
         pts += cr * gp;
         hrs += cr;
@@ -326,16 +326,30 @@
       return 'var(--danger)';
     }
 
+    // Normalize one course record to a canonical shape so the table renders
+    // correctly regardless of whether the data came from manual entry
+    // (uses {name, credits}) or the transcript parser
+    // (uses {nameAr, nameEn, creditHours}).
+    function _normCourse(c) {
+      return {
+        name: c.name || c.nameAr || c.nameEn || '—',
+        code: c.code || '—',
+        credits: parseFloat(c.credits ?? c.creditHours ?? c.hours) || 0,
+        grade: c.grade || null
+      };
+    }
+
     function renderSemesterCard(sem, idx) {
-      var gpa = calcSemGpa(sem.courses || []);
-      var totalHrs = (sem.courses || []).reduce(function(s,c){ return s + (parseFloat(c.credits)||0); }, 0);
+      var courses = (sem.courses || []).map(_normCourse);
+      var gpa = calcSemGpa(courses);
+      var totalHrs = courses.reduce(function(s,c){ return s + (c.credits || 0); }, 0);
       var gpaColor = parseFloat(gpa) >= 4 ? 'var(--success)'
         : parseFloat(gpa) >= 3 ? 'var(--accent)'
         : parseFloat(gpa) >= 2 ? 'var(--warning)'
         : 'var(--danger)';
 
       var coursesHtml = '';
-      if (sem.courses && sem.courses.length > 0) {
+      if (courses.length > 0) {
         coursesHtml = '<table style="width:100%;border-collapse:collapse;margin-top:12px;font-size:.78rem;">'
           + '<thead><tr style="border-bottom:1px solid var(--border);">'
           + '<th style="text-align:right;padding:4px 8px;color:var(--muted);font-weight:600;">المادة</th>'
@@ -343,10 +357,10 @@
           + '<th style="text-align:center;padding:4px 8px;color:var(--muted);font-weight:600;">الساعات</th>'
           + '<th style="text-align:center;padding:4px 8px;color:var(--muted);font-weight:600;">التقدير</th>'
           + '</tr></thead><tbody>';
-        sem.courses.forEach(function(c) {
+        courses.forEach(function(c) {
           coursesHtml += '<tr style="border-bottom:1px solid var(--border);">'
-            + '<td style="padding:5px 8px;">' + (c.name || '—') + '</td>'
-            + '<td style="padding:5px 8px;text-align:center;color:var(--muted);">' + (c.code || '—') + '</td>'
+            + '<td style="padding:5px 8px;">' + c.name + '</td>'
+            + '<td style="padding:5px 8px;text-align:center;color:var(--muted);">' + c.code + '</td>'
             + '<td style="padding:5px 8px;text-align:center;">' + (c.credits || '—') + '</td>'
             + '<td style="padding:5px 8px;text-align:center;font-weight:700;color:' + gradeColor(c.grade) + ';">' + (c.grade || '—') + '</td>'
             + '</tr>';
@@ -356,13 +370,16 @@
         coursesHtml = '<p class="muted" style="font-size:.78rem;margin-top:8px;text-align:center;">لا توجد مواد مسجلة لهذا الفصل.</p>';
       }
 
+      var semLabel = sem.name || sem.nameAr || sem.nameEn || 'فصل دراسي';
+      var semYear = sem.year || '';
+
       return '<div class="card gpa-card" style="padding:0;overflow:hidden;" data-sem-idx="' + idx + '">'
         + '<div class="gpa-card-head gpa-card-head-strip" style="cursor:pointer;" onclick="toggleSemDetails(' + idx + ')">'
         + '<div style="display:flex;align-items:center;gap:14px;">'
         + '<div style="width:48px;height:48px;background:var(--surface-2);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.2rem;">📘</div>'
         + '<div>'
-        + '<div style="font-weight:700;font-size:.92rem;">' + (sem.name || 'فصل دراسي') + '</div>'
-        + '<div class="muted" style="font-size:.75rem;">' + (sem.year || '') + ' · ' + totalHrs + ' ساعة</div>'
+        + '<div style="font-weight:700;font-size:.92rem;">' + semLabel + '</div>'
+        + '<div class="muted" style="font-size:.75rem;">' + semYear + ' · ' + totalHrs + ' ساعة</div>'
         + '</div></div>'
         + '<div style="display:flex;align-items:center;gap:12px;">'
         + '<div style="text-align:center;">'

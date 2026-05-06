@@ -50,6 +50,19 @@
      Single source of truth for student data
      ══════════════════════════════════════════ */
 
+  // Derive academic level from the count of completed semesters in
+  // localStorage 'uqu_semesters'. Returns '' when nothing is known so
+  // the caller can fall back to whatever the user typed in the profile.
+  function _deriveLevel() {
+    try {
+      const sems = JSON.parse(localStorage.getItem('uqu_semesters') || '[]') || [];
+      const completed = sems.filter(function (s) {
+        return s.status === 'completed' || (s.courses || []).some(function (c) { return c.grade; });
+      }).length;
+      return completed > 0 ? String(completed + 1) : '';
+    } catch (_) { return ''; }
+  }
+
   function getProfile() {
     const raw = sGet(KEYS.PROFILE);
     if (!raw) return null;
@@ -63,7 +76,7 @@
         name: b.name || '',
         university: b.university || 'جامعة أم القرى',
         major: b.major || '',
-        level: b.level || '',
+        level: b.level || _deriveLevel() || '',
         currentGpa: parseFloat(g.currentGpa) || 0,
         targetGpa: parseFloat(g.targetGpa) || 0,
         earnedHours: parseInt(g.earnedHours) || 0,
@@ -314,192 +327,14 @@
   }
 
   /* ══════════════════════════════════════════
-     5. CHAT COMMAND PARSER
-     Detects actionable commands in chat text
-     and executes them automatically.
+     5. CHAT ACTION EXECUTOR (REMOVED)
+     ─────────────────────────────────────────
+     executeChatActions() was removed because the backend agent
+     loop is now the sole authority for tool execution. The
+     frontend executeClientTool() in ai.js handles applying
+     backend-returned results to localStorage/UI.
      ══════════════════════════════════════════ */
 
-  // Arabic day names mapping
-  var dayMap = {
-    'الاحد': 'الأحد', 'الأحد': 'الأحد',
-    'الاثنين': 'الإثنين', 'الإثنين': 'الإثنين', 'الاتنين': 'الإثنين',
-    'الثلاثاء': 'الثلاثاء', 'الثلاثا': 'الثلاثاء',
-    'الاربعاء': 'الأربعاء', 'الأربعاء': 'الأربعاء',
-    'الخميس': 'الخميس',
-    'الجمعة': 'الجمعة', 'الجمعه': 'الجمعة',
-    'السبت': 'السبت'
-  };
-
-  var typeMap = {
-    'اختبار': 'exam', 'امتحان': 'exam', 'فاينال': 'exam', 'نهائي': 'exam',
-    'كويز': 'quiz', 'اختبار قصير': 'quiz',
-    'واجب': 'assignment', 'تكليف': 'assignment', 'هومورك': 'assignment',
-    'مشروع': 'project', 'بروجكت': 'project',
-    'تسليم': 'assignment', 'بحث': 'project'
-  };
-
-  /**
-   * Parse user message for actionable commands.
-   * Returns array of detected actions (may be empty).
-   */
-  function parseChatCommands(text) {
-    if (!text) return [];
-    var actions = [];
-    var t = text.trim();
-    var tNorm = normalizeAr(t);
-
-    // ── Pattern 1: Add course ──
-    // "أضف مادة هياكل البيانات" / "ضيف ماده كذا"
-    var addCourseRx = /(?:أضف|ضيف|اضف|سجل)\s*(?:مادة?|ماده|كورس|مقرر)\s+(.+?)(?:\s*(?:ساعات|ساعه|بصعوبه|صعب|سهل|$))/i;
-    var m = t.match(addCourseRx);
-    if (m) {
-      var name = m[1].replace(/[.،,]+$/, '').trim();
-      if (name.length > 1 && name.length < 80) {
-        var diff = 'normal';
-        if (/صعب|صعبه|hard/i.test(t)) diff = 'hard';
-        else if (/سهل|سهله|easy/i.test(t)) diff = 'easy';
-        var hours = 3;
-        var hm = t.match(/(\d+)\s*ساع/);
-        if (hm) hours = parseInt(hm[1]) || 3;
-        actions.push({ type: 'addCourse', data: { name: name, difficulty: diff, creditHours: hours, source: 'chat' } });
-      }
-    }
-
-    // ── Pattern 2: Add exam / task ──
-    // "اختباري الاسبوع القادم" / "عندي كويز يوم الخميس" / "اختبار هياكل البيانات يوم 25"
-    var examRx = /(?:عندي|اختبار[ي]?|كويز|واجب|مشروع|تسليم|بحث)\s+(.+?)(?:\s+(?:يوم|في|بتاريخ|الاسبوع|القادم|الجاي|بكره|غدا|باكر))/i;
-    var em = t.match(examRx);
-    if (em) {
-      var title = em[1].replace(/[.،,]+$/, '').trim();
-      var taskType = 'exam';
-      for (var kw in typeMap) {
-        if (t.indexOf(kw) !== -1) { taskType = typeMap[kw]; break; }
-      }
-
-      // Try to detect date
-      var deadline = '';
-      if (/بكره|غدا|باكر/i.test(t)) {
-        var tomorrow = new Date();
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        deadline = tomorrow.toISOString().split('T')[0];
-      } else if (/الاسبوع\s*(?:القادم|الجاي)/i.test(t)) {
-        var nextWeek = new Date();
-        nextWeek.setDate(nextWeek.getDate() + 7);
-        deadline = nextWeek.toISOString().split('T')[0];
-      } else {
-        // Try to find a date pattern like "25/3" or "2026-03-25"
-        var dateRx = /(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?/;
-        var dm = t.match(dateRx);
-        if (dm) {
-          var day = parseInt(dm[1]);
-          var month = parseInt(dm[2]);
-          var year = dm[3] ? parseInt(dm[3]) : new Date().getFullYear();
-          if (year < 100) year += 2000;
-          deadline = year + '-' + String(month).padStart(2, '0') + '-' + String(day).padStart(2, '0');
-        }
-      }
-
-      // Detect day name
-      var detectedDay = '';
-      for (var dk in dayMap) {
-        if (tNorm.indexOf(normalizeAr(dk)) !== -1) {
-          detectedDay = dayMap[dk];
-          break;
-        }
-      }
-
-      if (title.length > 1) {
-        actions.push({
-          type: 'addTask',
-          data: {
-            title: title,
-            type: taskType,
-            deadline: deadline,
-            day: detectedDay,
-            source: 'chat'
-          }
-        });
-      }
-    }
-
-    // ── Pattern 3: Record GPA ──
-    // "معدلي صار 3.8" / "حصلت على 4.2"
-    var gpaRx = /(?:معدل[ي]?\s*(?:صار|اصبح|الحين|الان|الجديد|التراكمي)?)\s*(\d+\.?\d*)/i;
-    var gm = t.match(gpaRx);
-    if (gm) {
-      var gpa = parseFloat(gm[1]);
-      if (gpa > 0 && gpa <= 5) {
-        actions.push({ type: 'updateGpa', data: { currentGpa: gpa } });
-      }
-    }
-
-    // ── Pattern 4: Set exam date for a course ──
-    // "اختبار هياكل البيانات يوم 25/4"
-    var examDateRx = /اختبار\s+(.+?)\s+(?:يوم|بتاريخ|في)\s+(\d{1,2}[\/\-]\d{1,2}(?:[\/\-]\d{2,4})?)/i;
-    var edm = t.match(examDateRx);
-    if (edm) {
-      var cname = edm[1].trim();
-      var dtStr = edm[2];
-      var dparts = dtStr.split(/[\/\-]/);
-      if (dparts.length >= 2) {
-        var dd = parseInt(dparts[0]);
-        var mm = parseInt(dparts[1]);
-        var yy = dparts[2] ? parseInt(dparts[2]) : new Date().getFullYear();
-        if (yy < 100) yy += 2000;
-        var isoDate = yy + '-' + String(mm).padStart(2, '0') + '-' + String(dd).padStart(2, '0');
-        actions.push({ type: 'setExamDate', data: { courseName: cname, examDate: isoDate } });
-      }
-    }
-
-    // ── Pattern 5: Delete/remove course ──
-    // "احذف مادة كذا" / "شيل مادة كذا"
-    var delCourseRx = /(?:احذف|شيل|ازل|حذف)\s*(?:مادة?|ماده|كورس|مقرر)\s+(.+?)$/i;
-    var dcm = t.match(delCourseRx);
-    if (dcm) {
-      var cNameDel = dcm[1].replace(/[.،,]+$/, '').trim();
-      if (cNameDel.length > 1) {
-        actions.push({ type: 'removeCourse', data: { name: cNameDel } });
-      }
-    }
-
-    return actions;
-  }
-
-  /**
-   * Execute parsed actions and return a summary for the chat to display.
-   */
-  function executeChatActions(actions) {
-    var results = [];
-    actions.forEach(function (action) {
-      switch (action.type) {
-        case 'addCourse':
-          addCourse(action.data);
-          results.push('✅ تمت إضافة مادة "' + action.data.name + '" للبروفايل');
-          break;
-        case 'removeCourse':
-          var removed = removeCourse(action.data.name);
-          results.push(removed
-            ? '✅ تم حذف مادة "' + action.data.name + '"'
-            : '⚠️ لم أجد مادة بهذا الاسم');
-          break;
-        case 'addTask':
-          addTask(action.data);
-          results.push('✅ تمت إضافة ' + (action.data.type === 'exam' ? 'اختبار' : 'مهمة') + ' "' + action.data.title + '"' + (action.data.deadline ? ' بتاريخ ' + action.data.deadline : ''));
-          break;
-        case 'updateGpa':
-          saveProfile({ currentGpa: action.data.currentGpa });
-          results.push('✅ تم تحديث المعدل إلى ' + action.data.currentGpa);
-          break;
-        case 'setExamDate':
-          var ok = addExamDate(action.data.courseName, action.data.examDate);
-          results.push(ok
-            ? '✅ تم تحديث موعد اختبار "' + action.data.courseName + '" إلى ' + action.data.examDate
-            : '⚠️ لم أجد مادة بهذا الاسم لتحديث موعد اختبارها');
-          break;
-      }
-    });
-    return results;
-  }
 
   /* ══════════════════════════════════════════
      6. TRANSCRIPT DATA PERSISTENCE
@@ -582,192 +417,6 @@
     return raw;
   }
 
-  /* ══════════════════════════════════════════
-     7. UNIFIED CONTEXT BUILDER
-     Rich context for AI chat system prompt.
-     ══════════════════════════════════════════ */
-
-  function buildStudentContext() {
-    var profile = getProfile();
-    var plan = sGet(KEYS.PLAN) || {};
-    var gpa = sGet(KEYS.GPA) || {};
-    var achievements = sGet(KEYS.ACHIEVE) || [];
-
-    var ctx = {
-      hasProfile: !!profile,
-      student: null,
-      courses: [],
-      exams: [],
-      tasks: [],
-      todaySessions: [],
-      upcomingSessions: [],
-      gpaInfo: null,
-      planStats: null,
-      achievements: [],
-      completedCourses: []
-    };
-
-    if (!profile) return ctx;
-
-    // Student info
-    ctx.student = {
-      name: profile.name,
-      university: profile.university,
-      major: profile.major,
-      level: profile.level,
-      currentGpa: profile.currentGpa,
-      targetGpa: profile.targetGpa,
-      earnedHours: profile.earnedHours,
-      planHours: profile.planHours,
-      goal: profile.goal,
-      studyPrefs: profile.learning
-    };
-
-    // Courses with exam countdowns
-    var now = new Date();
-    var todayISO = now.toISOString().split('T')[0];
-    ctx.courses = (profile.courses || []).map(function (c) {
-      var daysUntilExam = null;
-      if (c.examDate) {
-        var examDate = new Date(c.examDate + 'T00:00:00');
-        daysUntilExam = Math.ceil((examDate - now) / 86400000);
-      }
-      return {
-        name: c.name,
-        creditHours: c.creditHours,
-        difficulty: c.difficulty,
-        examDate: c.examDate,
-        daysUntilExam: daysUntilExam,
-        grade: c.grade,
-        progress: c.currentProgress
-      };
-    });
-
-    // Upcoming exams (sorted by date)
-    ctx.exams = ctx.courses
-      .filter(function (c) { return c.daysUntilExam !== null && c.daysUntilExam >= 0; })
-      .sort(function (a, b) { return a.daysUntilExam - b.daysUntilExam; });
-
-    // Today's sessions
-    var dayNames = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
-    var todayName = dayNames[now.getDay()];
-    var planSessions = plan.plan || [];
-    ctx.todaySessions = planSessions.filter(function (s) {
-      return s.date === todayISO || (s.day === todayName && !s.completed);
-    }).sort(function (a, b) { return (a.time || '').localeCompare(b.time || ''); });
-
-    // Upcoming sessions (next 7 days)
-    var weekFromNow = new Date(now);
-    weekFromNow.setDate(weekFromNow.getDate() + 7);
-    var weekISO = weekFromNow.toISOString().split('T')[0];
-    ctx.upcomingSessions = planSessions.filter(function (s) {
-      return s.date && s.date > todayISO && s.date <= weekISO && !s.completed;
-    }).sort(function (a, b) { return (a.date + a.time).localeCompare(b.date + b.time); }).slice(0, 10);
-
-    // Tasks
-    ctx.tasks = (plan.tasks || []).filter(function (t) { return !t.completed; });
-
-    // GPA info
-    ctx.gpaInfo = {
-      current: profile.currentGpa,
-      target: profile.targetGpa,
-      gap: profile.targetGpa - profile.currentGpa,
-      earnedHours: profile.earnedHours,
-      remainingHours: profile.planHours - profile.earnedHours,
-      totalPlanHours: profile.planHours
-    };
-
-    // Plan stats
-    var totalSessions = planSessions.length;
-    var completedSessions = planSessions.filter(function (s) { return s.completed; }).length;
-    ctx.planStats = {
-      totalSessions: totalSessions,
-      completedSessions: completedSessions,
-      completionRate: totalSessions > 0 ? Math.round(completedSessions / totalSessions * 100) : 0,
-      totalWeeks: plan.weeks || 0
-    };
-
-    // Completed courses (from transcript)
-    ctx.completedCourses = profile.completedCourses || [];
-
-    // Achievements
-    if (Array.isArray(achievements)) {
-      ctx.achievements = achievements.filter(function (a) { return a.earned; });
-    }
-
-    return ctx;
-  }
-
-  /**
-   * Generate a rich system prompt section for the AI.
-   */
-  function buildAIContextBlock() {
-    var ctx = buildStudentContext();
-    if (!ctx.hasProfile) return 'الطالب لم يعد ملفه الشخصي بعد.';
-
-    var lines = [];
-    var s = ctx.student;
-
-    lines.push('═══ بيانات الطالب ═══');
-    lines.push('الاسم: ' + (s.name || 'غير محدد'));
-    lines.push('الجامعة: ' + s.university + ' | التخصص: ' + (s.major || '—') + ' | المستوى: ' + (s.level || '—'));
-    lines.push('المعدل الحالي: ' + s.currentGpa + ' / 5.00 | المستهدف: ' + s.targetGpa);
-    lines.push('الساعات المنجزة: ' + s.earnedHours + ' / ' + s.planHours + ' (' + (s.planHours - s.earnedHours) + ' متبقية)');
-    lines.push('الهدف: ' + ({ raise: 'رفع المعدل', keep: 'المحافظة', pass: 'اجتياز' }[s.goal] || s.goal));
-
-    if (ctx.courses.length > 0) {
-      lines.push('');
-      lines.push('═══ مواد الفصل الحالي (' + ctx.courses.length + ') ═══');
-      ctx.courses.forEach(function (c) {
-        var info = '• ' + c.name + ' (' + c.creditHours + ' ساعات, ' + c.difficulty + ')';
-        if (c.daysUntilExam !== null) {
-          if (c.daysUntilExam <= 0) info += ' — ⚠️ الاختبار اليوم أو فات!';
-          else if (c.daysUntilExam <= 7) info += ' — ⚠️ الاختبار بعد ' + c.daysUntilExam + ' أيام!';
-          else info += ' — الاختبار بعد ' + c.daysUntilExam + ' يوم';
-        }
-        if (c.grade) info += ' | الدرجة: ' + c.grade;
-        lines.push(info);
-      });
-    }
-
-    if (ctx.exams.length > 0) {
-      lines.push('');
-      lines.push('═══ الاختبارات القادمة ═══');
-      ctx.exams.slice(0, 6).forEach(function (e) {
-        lines.push('• ' + e.name + ': بعد ' + e.daysUntilExam + ' يوم (' + e.examDate + ')');
-      });
-    }
-
-    if (ctx.todaySessions.length > 0) {
-      lines.push('');
-      lines.push('═══ جلسات اليوم ═══');
-      ctx.todaySessions.forEach(function (s) {
-        lines.push('• ' + (s.courseName || s.title || '—') + ' | ' + s.time + ' - ' + (s.timeEnd || '') + (s.completed ? ' ✅' : ''));
-      });
-    }
-
-    if (ctx.tasks.length > 0) {
-      lines.push('');
-      lines.push('═══ المهام القادمة (' + ctx.tasks.length + ') ═══');
-      ctx.tasks.slice(0, 5).forEach(function (t) {
-        lines.push('• ' + t.title + ' (' + (t.type || 'مهمة') + ')' + (t.deadline ? ' — ' + t.deadline : ''));
-      });
-    }
-
-    if (ctx.planStats && ctx.planStats.totalSessions > 0) {
-      lines.push('');
-      lines.push('═══ إحصائيات الخطة ═══');
-      lines.push('إجمالي الجلسات: ' + ctx.planStats.totalSessions + ' | مكتملة: ' + ctx.planStats.completedSessions + ' (' + ctx.planStats.completionRate + '%)');
-    }
-
-    if (ctx.gpaInfo && ctx.gpaInfo.gap > 0) {
-      lines.push('');
-      lines.push('═══ فجوة المعدل ═══');
-      lines.push('يحتاج رفع ' + ctx.gpaInfo.gap.toFixed(2) + ' نقطة للوصول للهدف | ' + ctx.gpaInfo.remainingHours + ' ساعة متبقية');
-    }
-
-    return lines.join('\n');
-  }
 
   /* ══════════════════════════════════════════
      8. EVENT BROADCASTING
@@ -897,16 +546,11 @@
     syncGpaFromProfile: syncGpaFromProfile,
     syncProfileFromGpa: syncProfileFromGpa,
 
-    // Chat integration
-    parseChatCommands: parseChatCommands,
-    executeChatActions: executeChatActions,
+    // AI/Chat Actions (REMOVED — backend handles tool execution)
+    // executeChatActions: executeChatActions,
 
     // Transcript
     applyTranscriptData: applyTranscriptData,
-
-    // AI Context
-    buildStudentContext: buildStudentContext,
-    buildAIContextBlock: buildAIContextBlock,
 
     // Events
     on: on,

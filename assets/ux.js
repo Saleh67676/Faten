@@ -146,29 +146,60 @@
   // ──────────────────────────────────────────────
 
   function initCountUp() {
+    function animate(el) {
+      const target   = parseFloat(el.dataset.countup || el.textContent.replace(/[^0-9.\-]/g,''));
+      if (!Number.isFinite(target)) return; // skip when value not yet bound
+      const decimals = el.dataset.decimals ? parseInt(el.dataset.decimals) : (target % 1 !== 0 ? 2 : 0);
+      const suffix   = el.dataset.suffix   || '';
+      const prefix   = el.dataset.prefix   || '';
+      const dur      = parseInt(el.dataset.dur) || 1000;
+      const start    = performance.now();
+      el.dataset.cuDone = '1';
+
+      function tick(now) {
+        const t   = Math.min((now - start) / dur, 1);
+        const ease = 1 - Math.pow(1 - t, 4); // easeOutQuart
+        el.textContent = prefix + (target * ease).toFixed(decimals) + suffix;
+        if (t < 1) requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    }
+
     const io = new IntersectionObserver(entries => {
       entries.forEach(({ isIntersecting, target: el }) => {
         if (!isIntersecting) return;
+        if (el.dataset.cuDone) { io.unobserve(el); return; }
+        const text = el.textContent.trim();
+        if (!text || /^[—\-]+$/.test(text)) return; // wait until bound
         io.unobserve(el);
-
-        const target   = parseFloat(el.dataset.countup || el.textContent.replace(/[^0-9.]/g,''));
-        const decimals = el.dataset.decimals ? parseInt(el.dataset.decimals) : (target % 1 !== 0 ? 2 : 0);
-        const suffix   = el.dataset.suffix   || '';
-        const prefix   = el.dataset.prefix   || '';
-        const dur      = parseInt(el.dataset.dur) || 1000;
-        const start    = performance.now();
-
-        function tick(now) {
-          const t   = Math.min((now - start) / dur, 1);
-          const ease = 1 - Math.pow(1 - t, 4); // easeOutQuart
-          el.textContent = prefix + (target * ease).toFixed(decimals) + suffix;
-          if (t < 1) requestAnimationFrame(tick);
-        }
-        requestAnimationFrame(tick);
+        animate(el);
       });
-    }, { threshold: 0.5 });
+    }, { threshold: 0.4 });
 
-    document.querySelectorAll('.stat, [data-countup]').forEach(el => io.observe(el));
+    function observeAll() {
+      document.querySelectorAll('.stat, [data-countup]').forEach(el => {
+        if (el.dataset.cuDone) return;
+        io.observe(el);
+      });
+    }
+
+    // Defer IO observation so data binders (DashboardController, etc.) get
+    // a chance to set the real value before count-up snapshots the placeholder.
+    setTimeout(observeAll, 250);
+    // Re-trigger when DashboardController (or anything else) updates the text
+    const mo = new MutationObserver(muts => {
+      muts.forEach(m => {
+        const el = m.target.nodeType === 1 ? m.target : m.target.parentElement;
+        if (!el || el.dataset.cuDone) return;
+        if (!el.matches('.stat, [data-countup]')) return;
+        const text = el.textContent.trim();
+        if (!text || /^[—\-]+$/.test(text)) return;
+        animate(el);
+      });
+    });
+    document.querySelectorAll('.stat, [data-countup]').forEach(el => {
+      mo.observe(el, { childList: true, characterData: true, subtree: true });
+    });
   }
 
   // ──────────────────────────────────────────────
@@ -926,6 +957,14 @@
   function initPageEnter() {
     const main = document.querySelector('.app-main');
     if (!main) return;
+    const reduced = window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduced) {
+      // Skip the fade entirely — leave defaults so content is visible.
+      main.style.opacity = '1';
+      main.style.transform = 'none';
+      return;
+    }
     main.style.opacity = '0';
     main.style.transform = 'translateY(12px)';
     main.style.transition = 'opacity .45s ease, transform .45s ease';
@@ -945,39 +984,14 @@
   function initDashboardSkeletons() {
     if (document.body.dataset.page !== 'dashboard') return;
 
-    // Show skeletons immediately
+    // Reserve space so layout doesn't jump while data loads,
+    // but DO NOT replace innerHTML — the skeleton template was racing
+    // DashboardController's text writes and clobbering the bound value.
     const statEls = document.querySelectorAll('.stat');
     statEls.forEach(el => {
-      el.dataset.originalText = el.textContent;
       el.style.minWidth = '80px';
       el.style.minHeight = '40px';
     });
-
-    // Apply skeleton to stat containers
-    const cards = document.querySelectorAll('.card .stat');
-    cards.forEach(el => Skeleton.show(el, 'stat'));
-
-    // Hide after first paint (when DashboardController fills them)
-    const mo = new MutationObserver(() => {
-      const allFilled = [...cards].every(el => {
-        const txt = el.textContent;
-        return txt && txt !== '—' && !el.dataset.skeletonActive;
-      });
-      if (allFilled) { mo.disconnect(); return; }
-
-      cards.forEach(el => {
-        const filled = el.textContent && el.textContent !== '—' && el.textContent.trim();
-        if (filled && el.dataset.skeletonActive) Skeleton.hide(el);
-      });
-    });
-
-    // Observe after a tick to let DashboardController run first
-    setTimeout(() => {
-      cards.forEach(el => {
-        if (el.textContent && el.textContent !== '—') Skeleton.hide(el);
-      });
-      mo.observe(document.body, { subtree: true, characterData: true, childList: true });
-    }, 400);
   }
 
   // ──────────────────────────────────────────────
@@ -1032,6 +1046,11 @@
       const o = opts || {};
 
       initPageEnter();
+      // Reveal .animate-block elements (dashboard cards, sections, etc.).
+      // Without this, every .animate-block stays at opacity:0 forever.
+      if (!o.noReveal && window.UQUCore?.observeReveal) {
+        try { window.UQUCore.observeReveal(); } catch (_) { }
+      }
       if (!o.noRipple)    initRipple();
       if (!o.noCountUp)   initCountUp();
       if (!o.noLazy)      initLazyLoad();

@@ -9,51 +9,127 @@
   'use strict';
 
   // ──────────────────────────────────────────────
-  // 1. CLOUD SYNCHRONIZATION (Firebase)
+  // 1. CLOUD SYNCHRONIZATION (Firebase) + LOCAL CACHE
   // ──────────────────────────────────────────────
-  const CloudDB = {
-    sessionsCache: [],
+  const LOCAL_KEY = 'uqu_pomodoro_sessions_v1';
 
-    // جلب الجلسات المكتملة من السحابة لعرضها في الإحصائيات
-    async fetchSessions() {
-      if (!window.FirebaseDB || !window.auth?.currentUser) return [];
-      try {
-        const uid = window.auth.currentUser.uid;
-        // افتراض وجود دالة جلب في FirebaseDB، أو جلبها مباشرة
-        const snapshot = await window.db.collection('users').doc(uid).collection('completed_sessions').get();
-        const sessions = [];
-        snapshot.forEach(doc => {
-          sessions.push({ id: doc.id, ...doc.data() });
-        });
-        this.sessionsCache = sessions.sort((a, b) => new Date(b.completedAt) - new Date(a.completedAt));
-        return this.sessionsCache;
-      } catch (error) {
-        console.error("❌ خطأ في جلب بيانات البومودورو السحابية:", error);
-        return [];
-      }
+  const LocalStore = {
+    all() {
+      try { return JSON.parse(localStorage.getItem(LOCAL_KEY) || '[]') || []; }
+      catch (_) { return []; }
     },
+    push(session) {
+      const list = this.all();
+      list.push(session);
+      // Keep last 500 sessions
+      try { localStorage.setItem(LOCAL_KEY, JSON.stringify(list.slice(-500))); }
+      catch (_) {}
+    }
+  };
 
-    // حفظ الجلسة في السحابة
+  const CloudDB = {
+    /**
+     * Save a completed focus session.
+     * Strategy: write LOCAL FIRST so the UI updates immediately even if
+     * the backend is unreachable. Then fire-and-forget the backend POST.
+     */
     async saveSession(courseCode, courseName, durationMins) {
-      if (!window.FirebaseDB || !window.FirebaseDB.logCompletedSession) {
-        console.warn("⚠️ تم الحفظ محلياً مؤقتاً لعدم توفر الاتصال بالسحابة");
-        return;
-      }
+      const payload = {
+        courseCode: courseCode || 'عام',
+        courseName: courseName || 'مذاكرة عامة',
+        duration: durationMins,
+        type: 'focus',
+        date: new Date().toISOString().split('T')[0],
+        completedAt: new Date().toISOString()
+      };
+
+      // 1) Local cache — single source of truth for instant UI updates
+      LocalStore.push(payload);
+      console.log('[Pomodoro] saved locally:', payload.courseName, payload.duration + 'm');
+
+      // 2) Cloud sync — best-effort (auth token handled by UQUCore.api)
       try {
-        await window.FirebaseDB.logCompletedSession({
-          courseCode: courseCode || 'عام',
-          courseName: courseName || 'مذاكرة عامة',
-          duration: durationMins,
-          type: 'focus',
-          date: new Date().toISOString().split('T')[0],
-          completedAt: new Date().toISOString()
-        });
-        console.log(`✅ Session Logged to Firebase: ${courseName} (${durationMins}m)`);
+        await window.UQUCore.api.post('/api/pomodoro/log', payload);
+        console.log(`[Pomodoro] ✅ cloud sync OK: ${courseName} (${durationMins}m)`);
       } catch (error) {
-        console.error("❌ فشل التوثيق السحابي للجلسة:", error);
+        console.warn('[Pomodoro] cloud sync skipped:', error.status || '', error.message);
       }
     }
   };
+
+  // ──────────────────────────────────────────────
+  // LOCAL STATS CALCULATOR (mirrors backend logic, used as fallback)
+  // ──────────────────────────────────────────────
+  function computeLocalStats() {
+    const sessions = LocalStore.all().filter(s => s.type === 'focus');
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    const todaySessions = sessions.filter(s => s.date === todayStr);
+    const todayCount = todaySessions.length;
+    const todayMinutes = todaySessions.reduce((a, s) => a + (s.duration || 0), 0);
+
+    const byDay = {};
+    sessions.forEach(s => { if (s.date) byDay[s.date] = (byDay[s.date] || 0) + 1; });
+    const bestDayCount = Object.values(byDay).reduce((a, b) => Math.max(a, b), 0);
+
+    const sortedDates = Object.keys(byDay).sort().reverse();
+    let currentStreak = 0;
+    if (sortedDates.length) {
+      const latest = new Date(sortedDates[0] + 'T00:00:00');
+      const today = new Date(todayStr + 'T00:00:00');
+      if ((today - latest) / 86400000 <= 1) {
+        currentStreak = 1;
+        for (let i = 1; i < sortedDates.length; i++) {
+          const a = new Date(sortedDates[i-1] + 'T00:00:00');
+          const b = new Date(sortedDates[i] + 'T00:00:00');
+          if ((a - b) / 86400000 === 1) currentStreak++;
+          else break;
+        }
+      }
+    }
+
+    const dayNames = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+    const weeklyChart = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(); d.setDate(d.getDate() - i);
+      const ds = d.toISOString().split('T')[0];
+      weeklyChart.push({
+        label: dayNames[d.getDay()],
+        count: sessions.filter(s => s.date === ds).length,
+        date: ds
+      });
+    }
+
+    const byCourse = {};
+    sessions.forEach(s => {
+      const n = s.courseName || 'مذاكرة عامة';
+      byCourse[n] = (byCourse[n] || 0) + (s.duration || 0);
+    });
+    const totalMin = Object.values(byCourse).reduce((a, b) => a + b, 0) || 1;
+    const courseBreakdown = Object.entries(byCourse)
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, duration]) => ({
+        name, duration, percentage: Math.round((duration / totalMin) * 100)
+      }));
+
+    const recentSessions = sessions
+      .slice()
+      .sort((a, b) => (b.completedAt || '').localeCompare(a.completedAt || ''))
+      .slice(0, 10);
+
+    return {
+      todaySessions: todayCount,
+      todayMinutes,
+      currentStreak,
+      bestDayCount,
+      weeklyChart,
+      courseBreakdown,
+      recentSessions,
+      totalSessions: sessions.length,
+      totalMinutes: sessions.reduce((a, s) => a + (s.duration || 0), 0),
+      bestStreak: 0
+    };
+  }
 
   // ──────────────────────────────────────────────
   // 2. FOCUS TIMER ENGINE (The Core Logic & Modal)
@@ -309,27 +385,12 @@
 
       // Persist completed FOCUS sessions to local + cloud
       if (wasFocus && !skipped) {
-        // Cloud
         try {
           await CloudDB.saveSession(
             this.currentCourse.code || 'عام',
             this.currentCourse.name || 'مذاكرة عامة',
             durationMins
           );
-        } catch(_) {}
-        // Local fallback (always log so stats work offline)
-        try {
-          const today = new Date().toISOString().split('T')[0];
-          const local = JSON.parse(localStorage.getItem('uqu_pomo_local') || '[]');
-          local.push({
-            date: today,
-            duration: durationMins,
-            type: 'focus',
-            courseCode: this.currentCourse.code || 'عام',
-            courseName: this.currentCourse.name || 'مذاكرة عامة',
-            completedAt: new Date().toISOString()
-          });
-          localStorage.setItem('uqu_pomo_local', JSON.stringify(local));
         } catch(_) {}
       }
 
@@ -457,96 +518,72 @@
   };
 
   // ──────────────────────────────────────────────
-  // 3. DASHBOARD & STATS (Only runs on Pomodoro Page)
+  // 3. DASHBOARD & STATS (Backend Powered)
   // ──────────────────────────────────────────────
   const Dashboard = {
+    _paint(stats) {
+      const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+      setEl('statSessions', stats.todaySessions);
+      setEl('statMinutes', stats.todayMinutes);
+      setEl('statStreak', stats.currentStreak);
+      setEl('statBest', stats.bestDayCount);
+      this.renderWeeklyChart(stats.weeklyChart);
+      this.renderHistory(stats.recentSessions);
+      this.renderCourseBreakdown(stats.courseBreakdown);
+    },
+
     async render() {
-      // التحقق مما إذا كنا في صفحة الإحصائيات/البومودورو
+      // Only run on the pomodoro page
       if (!document.getElementById('statSessions')) return;
 
-      // جلب البيانات السحابية + المحلية والدمج بينها
-      const cloud = await CloudDB.fetchSessions();
-      let local = [];
-      try { local = JSON.parse(localStorage.getItem('uqu_pomo_local') || '[]'); } catch(_) {}
+      // 1) Paint LOCAL stats immediately so the user sees their progress
+      //    even if the backend is offline or auth isn't ready yet.
+      this._paint(computeLocalStats());
 
-      // Merge with de-duplication by completedAt timestamp
-      const seen = new Set();
-      const sessions = [];
-      [...cloud, ...local].forEach(s => {
-        const key = s.completedAt || (s.date + '|' + s.duration + '|' + (s.courseCode||''));
-        if (!seen.has(key)) { seen.add(key); sessions.push(s); }
-      });
-      // Sort newest first
-      sessions.sort((a, b) => new Date(b.completedAt || b.date) - new Date(a.completedAt || a.date));
+      // 2) Try backend in the background; merge if it has more data.
+      try {
+        const baseUrl = window.AGENT_BASE_URL || 'http://localhost:8000';
+        const token = await window.UQUAuth?.getToken?.();
+        if (!token) return;
 
-      const today = new Date().toISOString().split('T')[0];
-      const todaySessions = sessions.filter(s => s.date === today && s.type === 'focus');
-
-      // تحديث الإحصائيات السريعة
-      const setEl = (id, val) => { if (document.getElementById(id)) document.getElementById(id).textContent = val; };
-
-      setEl('statSessions', todaySessions.length);
-      setEl('statMinutes', todaySessions.reduce((a, s) => a + s.duration, 0));
-      setEl('statStreak', this.calcStreak(sessions));
-      setEl('statBest', this.calcBestDay(sessions));
-
-      this.renderWeeklyChart(sessions);
-      this.renderHistory(sessions);
-      this.renderCourseBreakdown(sessions);
-    },
-
-    calcStreak(sessions) {
-      if (!sessions.length) return 0;
-      const dates = [...new Set(sessions.filter(s => s.type === 'focus').map(s => s.date))].sort().reverse();
-      if (!dates.length) return 0;
-
-      let streak = 0;
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      for (let i = 0; i < dates.length; i++) {
-        const expected = new Date(today);
-        expected.setDate(expected.getDate() - i);
-        const expectedStr = expected.toISOString().split('T')[0];
-        if (dates.includes(expectedStr)) streak++;
-        else break;
+        const response = await fetch(`${baseUrl}/api/pomodoro/stats`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!response.ok) {
+          console.warn('[Pomodoro] stats fetch failed', response.status);
+          return;
+        }
+        const cloud = await response.json();
+        // Prefer the larger of (local, cloud) for each counter so freshly
+        // saved local sessions don't disappear if Firestore hasn't synced.
+        const local = computeLocalStats();
+        const merged = {
+          todaySessions: Math.max(cloud.todaySessions || 0, local.todaySessions),
+          todayMinutes:  Math.max(cloud.todayMinutes  || 0, local.todayMinutes),
+          currentStreak: Math.max(cloud.currentStreak || 0, local.currentStreak),
+          bestDayCount:  Math.max(cloud.bestDayCount  || 0, local.bestDayCount),
+          weeklyChart:   cloud.weeklyChart   || local.weeklyChart,
+          recentSessions: (cloud.recentSessions && cloud.recentSessions.length)
+            ? cloud.recentSessions : local.recentSessions,
+          courseBreakdown: (cloud.courseBreakdown && cloud.courseBreakdown.length)
+            ? cloud.courseBreakdown : local.courseBreakdown,
+        };
+        this._paint(merged);
+      } catch (err) {
+        console.warn('[Pomodoro] stats error:', err.message);
       }
-      return streak;
     },
 
-    calcBestDay(sessions) {
-      const focusSessions = sessions.filter(s => s.type === 'focus');
-      if (!focusSessions.length) return 0;
-
-      const byDay = {};
-      focusSessions.forEach(s => {
-        byDay[s.date] = (byDay[s.date] || 0) + 1;
-      });
-      return Math.max(...Object.values(byDay));
-    },
-
-    renderWeeklyChart(sessions) {
+    renderWeeklyChart(days) {
       const container = document.getElementById('weeklyChart');
-      if (!container) return;
-
-      const focusSessions = sessions.filter(s => s.type === 'focus');
-      const today = new Date();
-      const days = [];
-
-      for (let i = 6; i >= 0; i--) {
-        const d = new Date(today);
-        d.setDate(d.getDate() - i);
-        const dateStr = d.toISOString().split('T')[0];
-        const count = focusSessions.filter(s => s.date === dateStr).length;
-        const dayNames = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
-        days.push({ label: dayNames[d.getDay()], count, date: dateStr });
-      }
+      if (!container || !days) return;
 
       const max = Math.max(...days.map(d => d.count), 1);
+      const todayStr = new Date().toISOString().split('T')[0];
 
       container.innerHTML = days.map(d => {
         const h = Math.max(4, (d.count / max) * 100);
-        const isToday = d.date === today.toISOString().split('T')[0];
+        const isToday = d.date === todayStr;
         return `<div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:4px;">
           <span class="muted" style="font-size:.65rem;">${d.count}</span>
           <div style="width:100%; height:${h}%; min-height:4px; background:${isToday ? 'var(--accent)' : 'var(--accent-dim)'}; border-radius:6px 6px 0 0; transition:height .5s ease;"></div>
@@ -555,13 +592,11 @@
       }).join('');
     },
 
-    renderHistory(sessions) {
+    renderHistory(recent) {
       const container = document.getElementById('sessionHistory');
       if (!container) return;
 
-      const recent = sessions.filter(s => s.type === 'focus').slice(0, 10); // أحدث 10 جلسات
-
-      if (!recent.length) {
+      if (!recent || !recent.length) {
         container.innerHTML = '<p class="muted" style="text-align:center; font-size:.85rem; padding:20px 0;">لا توجد جلسات بعد. ابدأ أول جلسة من الخطة!</p>';
         return;
       }
@@ -579,54 +614,46 @@
       }).join('');
     },
 
-    renderCourseBreakdown(sessions) {
+    renderCourseBreakdown(breakdown) {
       const container = document.getElementById('courseBreakdown');
       if (!container) return;
 
-      const focusSessions = sessions.filter(s => s.type === 'focus');
-      if (!focusSessions.length) {
+      if (!breakdown || !breakdown.length) {
         container.innerHTML = '<p class="muted" style="text-align:center; font-size:.85rem;">ابدأ جلسات لرؤية التوزيع</p>';
         return;
       }
 
-      const byCourse = {};
-      focusSessions.forEach(s => {
-        const name = s.courseName || 'مذاكرة عامة';
-        byCourse[name] = (byCourse[name] || 0) + s.duration;
-      });
-
-      const total = Object.values(byCourse).reduce((a, b) => a + b, 0);
       const colors = ['#6366f1', '#8b5cf6', '#ec4899', '#14b8a6', '#f59e0b', '#3b82f6'];
       let i = 0;
 
-      container.innerHTML = Object.entries(byCourse)
-        .sort((a, b) => b[1] - a[1])
-        .map(([name, mins]) => {
-          const pct = Math.round((mins / total) * 100);
-          const color = colors[i++ % colors.length];
-          return `<div style="margin-bottom: 12px;">
-            <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-              <span style="font-size:.82rem; font-weight:600;">${name}</span>
-              <span class="muted" style="font-size:.75rem;">${mins} دقيقة (${pct}%)</span>
-            </div>
-            <div style="height:6px; background:var(--surface-2); border-radius:99px; overflow:hidden;">
-              <div style="height:100%; width:${pct}%; background:${color}; border-radius:99px; transition:width .5s ease;"></div>
-            </div>
-          </div>`;
-        }).join('');
+      container.innerHTML = breakdown.map(item => {
+        const color = colors[i++ % colors.length];
+        return `<div style="margin-bottom: 12px;">
+          <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+            <span style="font-size:.82rem; font-weight:600;">${item.name}</span>
+            <span class="muted" style="font-size:.75rem;">${item.duration} دقيقة (${item.percentage}%)</span>
+          </div>
+          <div style="height:6px; background:var(--surface-2); border-radius:99px; overflow:hidden;">
+            <div style="height:100%; width:${item.percentage}%; background:${color}; border-radius:999px; transition:width .5s ease;"></div>
+          </div>
+        </div>`;
+      }).join('');
     }
   };
 
   // ──────────────────────────────────────────────
   // 4. INITIALIZATION
   // ──────────────────────────────────────────────
-  function initApp() {
+  async function initApp() {
     TimerEngine.init();
 
-    // تأخير الرندرة قليلاً للتأكد من تحميل Firebase و auth
-    setTimeout(() => {
-      Dashboard.render();
-    }, 1500);
+    // انتظر جاهزية Firebase Auth قبل طلب الإحصائيات (تجنب 401)
+    try {
+      if (window.UQUAuth?.waitForAuthReady) {
+        await window.UQUAuth.waitForAuthReady(5000);
+      }
+    } catch (_) { /* proceed regardless */ }
+    Dashboard.render();
   }
 
   if (document.readyState === 'loading') {

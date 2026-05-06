@@ -1,0 +1,240 @@
+/**
+ * ════════════════════════════════════════════════════════════════
+ * UQU TRANSCRIPT PARSER v3.0 — Thin Client (Backend-Powered)
+ * ════════════════════════════════════════════════════════════════
+ * ARCHITECTURE: All PDF extraction, column detection, course
+ * parsing, semester classification, and GPA extraction now run
+ * exclusively on the FastAPI backend (services/transcript.py).
+ *
+ * This file is a THIN CLIENT that:
+ *  1. Uploads the PDF via FormData → POST /api/transcript/analyze
+ *  2. Receives the structured TranscriptAnalysisResult JSON
+ *  3. Renders a beautiful semester-separated preview (renderPreview)
+ *
+ * The renderPreview() function and display constants (GRADE_MAP,
+ * GRADE_COLORS, GRADE_LABELS) remain client-side because they are
+ * pure UI rendering — no business logic.
+ * ════════════════════════════════════════════════════════════════
+ */
+(function (window) {
+  'use strict';
+
+  /* ═══════════════════════════════════════════════════════════
+     DISPLAY CONSTANTS (UI-only — used by renderPreview)
+     ═══════════════════════════════════════════════════════════ */
+
+  const GRADE_MAP = {
+    'A+': 5.00, 'A': 4.75, 'B+': 4.50, 'B': 4.00,
+    'C+': 3.50, 'C': 3.00, 'D+': 2.50, 'D': 2.00,
+    'F': 1.00, 'DN': 0,
+    'W': null, 'IP': null, 'IC': null, 'NP': null,
+  };
+
+  const GRADE_COLORS = {
+    'A+': '#10b981', 'A': '#10b981', 'B+': '#06b6d4', 'B': '#06b6d4',
+    'C+': '#f59e0b', 'C': '#f59e0b', 'D+': '#f97316', 'D': '#f97316',
+    'F': '#ef4444', 'DN': '#ef4444',
+  };
+
+  const GRADE_LABELS = {
+    'A+': 'ممتاز مرتفع', 'A': 'ممتاز', 'B+': 'جيد جداً مرتفع', 'B': 'جيد جداً',
+    'C+': 'جيد مرتفع', 'C': 'جيد', 'D+': 'مقبول مرتفع', 'D': 'مقبول',
+    'F': 'راسب', 'DN': 'محروم',
+  };
+
+  /* ═══════════════════════════════════════════════════════════
+     1. THIN CLIENT — Upload PDF to Backend
+     ═══════════════════════════════════════════════════════════ */
+
+  /**
+   * Uploads a PDF File to the backend transcript parser and returns
+   * the structured TranscriptAnalysisResult.
+   *
+   * @param {File} file — The user-selected PDF file
+   * @returns {Promise<Object>} — Parsed transcript data matching
+   *   the TranscriptAnalysisResult schema
+   */
+  async function parseTranscriptPDF(file) {
+    if (!file || !file.name.toLowerCase().endsWith('.pdf')) {
+      throw new Error('الملف يجب أن يكون بصيغة PDF');
+    }
+
+    // ── Auth Guard ──
+    var token = null;
+    try {
+      if (window.FirebaseDB && window.FirebaseDB.getIdToken) {
+        token = await window.FirebaseDB.getIdToken();
+      } else if (window.FirebaseAuth && window.FirebaseAuth.getIdToken) {
+        token = await window.FirebaseAuth.getIdToken();
+      }
+    } catch (_) { /* proceed without token if unavailable */ }
+
+    if (!token) {
+      if (window.UQUCore && window.UQUCore.toast) {
+        window.UQUCore.toast('يرجى تسجيل الدخول أولاً لتحليل السجل', 'warning');
+      }
+      throw new Error('يرجى تسجيل الدخول أولاً');
+    }
+
+    // ── Upload to Backend ──
+    var baseUrl = window.AGENT_BASE_URL || 'http://localhost:8000';
+    var formData = new FormData();
+    formData.append('file', file);
+
+    var response = await fetch(baseUrl + '/api/transcript/analyze', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + token
+      },
+      body: formData
+    });
+
+    if (!response.ok) {
+      var errData = {};
+      try { errData = await response.json(); } catch (_) {}
+      throw new Error(errData.detail || 'فشل تحليل السجل الأكاديمي. تأكد أنه ملف رسمي (' + response.status + ')');
+    }
+
+    var result = await response.json();
+
+    // ── Enrich with computed convenience fields for UI ──
+    // These are purely for the profile.html caller compatibility
+    result.currentSemesterCourses = result.registeredCourses || [];
+    result.allCourses = (result.completedCourses || []).concat(result.registeredCourses || []);
+    result.pageCount = result.pageCount || 0;
+
+    return result;
+  }
+
+  /* ═══════════════════════════════════════════════════════════
+     2. RENDER PREVIEW — Beautiful Semester-Separated UI
+     (Pure frontend rendering — no business logic)
+     ═══════════════════════════════════════════════════════════ */
+
+  function renderPreview(data) {
+    // Student info header
+    var infoFields = [
+      { icon: '👤', label: 'الاسم', value: data.name || data.nameEn },
+      { icon: '🏛️', label: 'الجامعة', value: data.university },
+      { icon: '📚', label: 'التخصص', value: data.major || data.majorEn },
+      { icon: '🎓', label: 'الدرجة', value: data.degree },
+      { icon: '📅', label: 'نوع الدراسة', value: data.studyType === 'full' ? 'انتظام' : (data.studyType === 'part' ? 'انتساب' : data.studyType) },
+      { icon: '🆔', label: 'الرقم الجامعي', value: data.studentId },
+      { icon: '📊', label: 'المعدل التراكمي', value: data.gpa ? data.gpa.toFixed(2) + ' / ' + (window.APP_GPA_SCALE || '5.00') : null },
+      { icon: '⏱️', label: 'الساعات المكتسبة', value: data.earnedHours ? data.earnedHours + ' ساعة' : null },
+      { icon: '📋', label: 'ساعات الخطة', value: data.planHours ? data.planHours + ' ساعة' : null },
+    ];
+
+    var infoHtml = infoFields.filter(function (f) { return f.value; }).map(function (f) {
+      return '<div class="tp2-info-item"><span class="tp2-info-icon">' + f.icon + '</span><span class="tp2-info-label">' + f.label + ':</span><span class="tp2-info-value">' + f.value + '</span></div>';
+    }).join('');
+
+    // Semester summary stats
+    var completedSems = (data.semesters || []).filter(function (s) { return s.status === 'completed'; });
+    var registeredSems = (data.semesters || []).filter(function (s) { return s.status === 'registered'; });
+
+    // Build completed semesters HTML (collapsible)
+    var completedHtml = '';
+    if (completedSems.length > 0) {
+      var semCards = completedSems.map(function (sem, idx) {
+        var coursesHtml = (sem.courses || []).map(function (c) {
+          var gradeColor = c.grade ? (GRADE_COLORS[c.grade] || 'var(--muted)') : 'var(--muted)';
+          var displayName = c.nameAr || c.nameEn || '—';
+          return '<div class="tp2-course-row">' +
+            '<span class="tp2-course-code">' + (c.code || '') + '</span>' +
+            '<span class="tp2-course-name">' + displayName + '</span>' +
+            '<span class="tp2-course-hrs">' + (c.creditHours || '—') + 'س</span>' +
+            '<span class="tp2-course-grade" style="color:' + gradeColor + '">' + (c.grade || '—') + '</span>' +
+            '</div>';
+        }).join('');
+
+        var semLabel = sem.nameAr || sem.nameEn;
+        var sgpaStr = sem.sgpa ? sem.sgpa.toFixed(2) : '—';
+        var cgpaStr = sem.cgpa ? sem.cgpa.toFixed(2) : '—';
+        var totalH = sem.totalHours || (sem.courses || []).reduce(function (s, c) { return s + (c.creditHours || 0); }, 0);
+
+        return '<details class="tp2-sem-card" data-sem-idx="' + idx + '" style="margin-bottom:12px; background:var(--bg); border:1px solid var(--border); border-radius:12px; overflow:hidden;" ' + (idx === 0 ? 'open' : '') + '>' +
+          '<summary class="tp2-sem-header" style="padding:16px; cursor:pointer; list-style:none; display:flex; justify-content:space-between; align-items:center; background:var(--surface-2); font-weight:bold; border-bottom:1px solid rgba(0,0,0,0.1); outline:none;">' +
+          '<div class="tp2-sem-info" style="display:flex; flex-direction:column; gap:4px;">' +
+          '<span class="tp2-sem-name" style="color:var(--accent); font-size: 1.05rem;">' + semLabel + '</span>' +
+          '<div class="tp2-sem-meta" style="font-size:0.85rem; color:var(--muted); display:flex; gap: 8px; flex-wrap: wrap; margin-top: 4px;">' +
+          '<span class="tp2-sem-gpa" style="background: rgba(16, 185, 129, 0.1); color: var(--success); padding: 2px 8px; border-radius: 4px;">فصلي: ' + sgpaStr + '</span>' +
+          '<span class="tp2-sem-gpa" style="background: rgba(99, 102, 241, 0.1); color: var(--accent); padding: 2px 8px; border-radius: 4px;">تراكمي: ' + cgpaStr + '</span>' +
+          '<span class="tp2-sem-sep" style="margin:0 2px;">•</span>' +
+          '<span>' + (sem.courses || []).length + ' مواد</span>' +
+          '<span class="tp2-sem-sep" style="margin:0 2px;">•</span>' +
+          '<span>' + totalH + ' ساعة</span>' +
+          '</div></div>' +
+          '<span class="tp2-sem-toggle" style="opacity:0.6; font-size:1.1rem; color:var(--accent);">▼</span>' +
+          '</summary>' +
+          '<div class="tp2-sem-courses" style="padding:16px;">' + coursesHtml + '</div>' +
+          '</details>';
+      }).join('');
+
+      completedHtml = '<div class="tp2-section">' +
+        '<div class="tp2-section-title" style="margin-bottom:12px; font-weight:bold; color:var(--fg);">✅ الفصول المكتملة <span class="tp2-section-badge" style="font-size:0.8rem; font-weight:normal; color:var(--muted); margin-right:8px;">' + completedSems.length + ' فصول — ' + (data.completedCourses || []).length + ' مادة</span></div>' +
+        '<div class="tp2-sem-list" style="max-height: 350px; overflow-y: auto; padding-right:8px; border:1px solid var(--border); padding:12px; border-radius:12px; background:var(--surface);">' + semCards + '</div></div>';
+    }
+
+    // Build registered/current semester HTML
+    var registeredHtml = '';
+    if (registeredSems.length > 0) {
+      var regCourses = '';
+      for (var ri = 0; ri < registeredSems.length; ri++) {
+        var rsem = registeredSems[ri];
+        regCourses += (rsem.courses || []).map(function (c) {
+          var displayName = c.nameAr || c.nameEn || '—';
+          return '<div class="tp2-course-row tp2-course-registered">' +
+            '<span class="tp2-course-code">' + (c.code || '') + '</span>' +
+            '<span class="tp2-course-name">' + displayName + '</span>' +
+            '<span class="tp2-course-hrs">' + (c.creditHours || '?') + 'س</span>' +
+            '<span class="tp2-course-status">📝 مسجل</span>' +
+            '</div>';
+        }).join('');
+      }
+
+      var regLabel = registeredSems[0].nameAr || registeredSems[0].nameEn || 'الفصل الحالي';
+      registeredHtml = '<div class="tp2-section tp2-section-current">' +
+        '<div class="tp2-section-title">📝 مواد الفصل الحالي / المسجل <span class="tp2-section-badge tp2-badge-current">' + regLabel + ' — ' + (data.registeredCourses || []).length + ' مواد</span></div>' +
+        '<div class="tp2-reg-list">' + regCourses + '</div>' +
+        '</div>';
+    }
+
+    // Confidence
+    var confColor = data.confidence >= 70 ? 'var(--success)' : data.confidence >= 40 ? '#f59e0b' : 'var(--danger)';
+    var confLabel = data.confidence >= 70 ? 'دقة عالية' : data.confidence >= 40 ? 'دقة متوسطة' : 'دقة منخفضة';
+
+    // Full preview
+    return '<div class="tp2-preview">' +
+      '<div class="tp2-header">' +
+      '<div class="tp2-header-title">✅ تم تحليل السجل الأكاديمي بنجاح</div>' +
+      '<div class="tp2-confidence" style="color:' + confColor + '"><span class="tp2-conf-dot" style="background:' + confColor + '"></span>' + confLabel + ' (' + data.confidence + '%)</div>' +
+      '</div>' +
+      '<div class="tp2-info-grid">' + infoHtml + '</div>' +
+      '<div class="tp2-stats">' +
+      '<div class="tp2-stat"><div class="tp2-stat-num">' + (data.semesters || []).length + '</div><div class="tp2-stat-lbl">فصل دراسي</div></div>' +
+      '<div class="tp2-stat"><div class="tp2-stat-num">' + ((data.completedCourses || []).length + (data.registeredCourses || []).length) + '</div><div class="tp2-stat-lbl">مادة إجمالية</div></div>' +
+      '<div class="tp2-stat"><div class="tp2-stat-num" style="color:var(--accent)">' + (data.gpa ? data.gpa.toFixed(2) : '—') + '</div><div class="tp2-stat-lbl">المعدل التراكمي</div></div>' +
+      '</div>' +
+      completedHtml +
+      registeredHtml +
+      '<div class="tp2-actions">' +
+      '<button class="btn-primary tp2-apply-btn" onclick="window._applyTranscriptData()">✅ تطبيق البيانات على البروفايل</button>' +
+      '<button class="btn-ghost" onclick="document.getElementById(\'transcriptPreview\').style.display=\'none\'">تخطي</button>' +
+      '</div></div>';
+  }
+
+  /* ═══════════════════════════════════════════════════════════
+     PUBLIC API (same surface as v2.0 — no breaking changes)
+     ═══════════════════════════════════════════════════════════ */
+
+  window.UQUTranscript = {
+    parseTranscriptPDF: parseTranscriptPDF,
+    renderPreview: renderPreview,
+    GRADE_MAP: GRADE_MAP,
+    GRADE_LABELS: GRADE_LABELS,
+    GRADE_COLORS: GRADE_COLORS,
+  };
+
+  console.log('%cUQU Transcript v3.0 ✓ (Thin Client — Backend-Powered)', 'background:#0f172a;color:#10b981;padding:2px 7px;border-radius:4px;font-weight:bold;');
+})(window);

@@ -320,5 +320,98 @@ TOOLS_SCHEMA: list[dict] = [
         }
     },
 
+    # ── 14. Navigate to Page ──
+    {
+        "type": "function",
+        "function": {
+            "name": "navigate_to_page",
+            "description": "انتقل بالطالب إلى صفحة محددة في التطبيق. استخدمها عندما يطلب فتح صفحة: المعدل، الخطة، البومودورو، القاعات، الملف الشخصي، أو اللوحة.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "page": {
+                        "type": "string",
+                        "enum": ["dashboard", "gpa", "plan", "pomodoro", "locations", "profile", "chat"],
+                        "description": "dashboard=اللوحة, gpa=المعدل, plan=الخطة, pomodoro=بومودورو, locations=القاعات, profile=الملف الشخصي, chat=الدردشة"
+                    }
+                },
+                "required": ["page"]
+            }
+        }
+    },
+
+    # ── 15. Change Theme ──
+    {
+        "type": "function",
+        "function": {
+            "name": "change_theme",
+            "description": "غيّر مظهر التطبيق بين الوضع الليلي والنهاري. استخدمها عندما يطلب الطالب تغيير المظهر.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "theme": {
+                        "type": "string",
+                        "enum": ["dark", "light", "auto"],
+                        "description": "dark=ليلي, light=نهاري, auto=تلقائي"
+                    }
+                },
+                "required": ["theme"]
+            }
+        }
+    },
+
+    # ── 16. Get GPA History ──
+    {
+        "type": "function",
+        "function": {
+            "name": "get_gpa_history",
+            "description": "احصل على تاريخ المعدل التراكمي عبر الفصول الدراسية. استخدمها عند سؤال الطالب عن مسار معدله أو تطوره عبر الفصول.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "limit": {
+                        "type": "number",
+                        "description": "عدد الفصول المطلوبة (افتراضي 20)"
+                    }
+                }
+            }
+        }
+    },
+
+    # ── 17. Add Semester GPA ──
+    {
+        "type": "function",
+        "function": {
+            "name": "add_semester_gpa",
+            "description": "سجّل معدل فصل دراسي في السجل الأكاديمي. استخدمها عندما يخبرك الطالب بمعدله في فصل معين.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "name":  {"type": "string", "description": "اسم الفصل (مثل: الفصل الأول 1446)"},
+                    "gpa":   {"type": "number", "description": "المعدل التراكمي للفصل (من 5.00)"},
+                    "hours": {"type": "number", "description": "الساعات المعتمدة في هذا الفصل (اختياري)"}
+                },
+                "required": ["name", "gpa"]
+            }
+        }
+    },
+
+    # ── 18. Update Course Grade ──
+    {
+        "type": "function",
+        "function": {
+            "name": "update_course_grade",
+            "description": "حدّث درجة مادة في قائمة مواد الفصل الحالي. استخدمها عندما يخبرك الطالب بدرجته في مادة.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "course_name": {"type": "string", "description": "اسم المادة"},
+                    "grade":       {"type": "number", "description": "الدرجة الجديدة (من 5.00 على مقياس النقاط)"}
+                },
+                "required": ["course_name", "grade"]
+            }
+        }
+    },
+
 ]
 

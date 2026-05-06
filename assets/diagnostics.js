@@ -28,186 +28,73 @@
     'C+': 67, 'C': 62, 'C-': 57, 'D+': 52, 'D': 47, 'D-': 44, 'F': 0
   };
 
+  /**
+   * resolveGrade(course)
+   * Thin wrapper to maintain compatibility if called elsewhere.
+   */
   function resolveGrade(course) {
-    // Returns { grade: 'A+', points: 5.00, score: 97 }
-    let grade = course.grade || null;
-    let score = course.score != null ? parseFloat(course.score) : null;
-    let points = course.gradePoints != null ? parseFloat(course.gradePoints) : null;
-
-    if (!grade && score != null && !isNaN(score)) grade = GRADE_FROM_SCORE(score);
-    if (!grade && points != null && !isNaN(points)) {
-      grade = Object.entries(GRADE_POINTS).find(([, v]) => Math.abs(v - points) < 0.01)?.[0] ?? null;
-    }
-    if (grade && points == null) points = GRADE_POINTS[grade] ?? null;
-    if (grade && score == null) score = GRADE_TO_SCORE[grade] ?? null;
-
-    return { grade: grade || '?', points: points ?? 0, score: score ?? 0 };
+    let grade = course.grade || '?';
+    let points = course.gradePoints || 0;
+    let score = course.score || 0;
+    return { grade, points, score };
   }
 
-  // ── 1. CORE DIAGNOSTIC GENERATOR ────────────────────────────────
+  // ── 1. CORE DIAGNOSTIC GENERATOR (REMOTE) ────────────────────────
   /**
    * generateDiagnostics(semesters, currentCourses, goals)
-   *
-   * @param {Array}  semesters       - Array of { name, gpa, sgpa, earnedCredits, courses[] }
-   * @param {Array}  currentCourses  - Current semester course objects
-   * @param {Object} goals           - { currentGpa, targetGpa, earnedHours, planHours, totalPoints }
-   * @returns {Object} Full diagnostic report
+   * Fetches full diagnostic report from FastAPI backend.
    */
-  function generateDiagnostics(semesters = [], currentCourses = [], goals = {}) {
-    // ── Flatten all completed semester courses ──────────────────
-    const allCourses = [];
-    semesters.forEach(sem => {
-      (sem.courses || []).forEach(c => {
-        const { grade, points, score } = resolveGrade(c);
-        if (points == null) return;
-        allCourses.push({
-          ...c,
-          _grade:   grade,
-          _points:  points,
-          _score:   score,
-          _semName: sem.name || '',
-          _credits: parseFloat(c.credits || c.creditHours || c.hours) || 0
-        });
+  async function generateDiagnostics(semesters = [], currentCourses = [], goals = {}) {
+    try {
+      const baseUrl = window.AGENT_BASE_URL || 'http://localhost:8000';
+      const token = await (window.UQUAuth?.getToken?.() || Promise.resolve(null));
+
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch(`${baseUrl}/api/diagnostics/analyze`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ semesters, currentCourses, goals })
       });
-    });
 
-    const hasSemesterData = allCourses.length > 0;
-
-    // ── Strengths: grade A- and above (points >= 4.50) ──────────
-    const strengths = allCourses
-      .filter(c => c._points >= 4.50)
-      .sort((a, b) => b._points - a._points || b._credits - a._credits)
-      .slice(0, 6);
-
-    // ── Weaknesses: D+ and below (points <= 2.25), passed (not F) ──
-    const weaknesses = allCourses
-      .filter(c => c._points > 0 && c._points <= 2.25)
-      .sort((a, b) => a._points - b._points)
-      .slice(0, 5);
-
-    // ── Failed courses ──────────────────────────────────────────
-    const failed = allCourses.filter(c => c._points === 0 && c._grade === 'F');
-
-    // ── Grade distribution ──────────────────────────────────────
-    const dist = { excellent: 0, good: 0, acceptable: 0, poor: 0, failed: 0 };
-    for (const c of allCourses) {
-      if (c._points >= 4.50)     dist.excellent++;
-      else if (c._points >= 3.75) dist.good++;
-      else if (c._points >= 2.50) dist.acceptable++;
-      else if (c._points > 0)     dist.poor++;
-      else                        dist.failed++;
+      if (!res.ok) throw new Error('فشل تحليل البيانات من الخادم');
+      return await res.json();
+    } catch (err) {
+      console.error('Diagnostics Error:', err);
+      // Return a basic empty structure to prevent UI crash
+      return {
+        hasSemesterData: false,
+        insights: [{ type: 'danger', icon: '❌', text: 'عذراً، فشل الاتصال بمحرك التحليل.' }],
+        allCourses: [], strengths: [], weaknesses: [], failed: [], dist: {}
+      };
     }
-
-    // ── Semester trend ──────────────────────────────────────────
-    const semTrend = semesters
-      .filter(s => s.gpa != null && !isNaN(s.gpa))
-      .map(s => ({
-        name: s.name || '—',
-        gpa:  parseFloat(s.gpa),
-        sgpa: s.sgpa != null ? parseFloat(s.sgpa) : parseFloat(s.gpa)
-      }));
-
-    const bestSem  = semTrend.length ? semTrend.reduce((a, b) => a.sgpa >= b.sgpa ? a : b) : null;
-    const worstSem = semTrend.length ? semTrend.reduce((a, b) => a.sgpa <= b.sgpa ? a : b) : null;
-
-    // ── GPA trend direction ─────────────────────────────────────
-    let trendDir = 'stable';
-    if (semTrend.length >= 2) {
-      const last2 = semTrend.slice(-2);
-      const diff  = last2[1].gpa - last2[0].gpa;
-      trendDir = diff > 0.1 ? 'rising' : diff < -0.1 ? 'falling' : 'stable';
-    }
-
-    // ── Goal calculator ─────────────────────────────────────────
-    const currentGpa = parseFloat(goals.currentGpa) || 0;
-    const earnedHours = parseFloat(goals.earnedHours) || 0;
-    const targetGpa   = parseFloat(goals.targetGpa)   || null;
-    const totalPoints = parseFloat(goals.totalPoints)  || (currentGpa * earnedHours);
-
-    let goalCalcResults = null;
-    if (targetGpa) {
-      goalCalcResults = [9, 12, 15, 18, 21].map(termHours => {
-        // Formula: neededTermGpa = (target*(earned+S) - currentPoints) / S
-        const currentPoints = totalPoints || (currentGpa * earnedHours);
-        const needed = ((targetGpa * (earnedHours + termHours)) - currentPoints) / termHours;
-        const feasible = needed <= 5.0 && needed >= 0;
-        return {
-          termHours,
-          needed:   +Math.min(5, Math.max(0, needed)).toFixed(2),
-          feasible,
-          label:    needed > 5   ? 'غير ممكن' :
-                    needed > 4.5 ? 'صعب جداً' :
-                    needed > 3.5 ? 'محتاج تركيز' :
-                    needed > 2.5 ? 'ممكن'   : 'سهل'
-        };
-      });
-    }
-
-    // ── Personalized insight sentences ─────────────────────────
-    const insights = [];
-
-    if (hasSemesterData) {
-      if (strengths.length) {
-        insights.push({
-          type: 'success',
-          icon: '⭐',
-          text: `أداؤك استثنائي في ${strengths.length} مادة — أبرزها: ${strengths.slice(0,2).map(c => c.name).join(' و ')}.`
-        });
-      }
-      if (weaknesses.length) {
-        insights.push({
-          type: 'warning',
-          icon: '⚠️',
-          text: `تحتاج لمراجعة أساسيات: ${weaknesses.slice(0,2).map(c => c.name).join(' و ')}.`
-        });
-      }
-      if (trendDir === 'rising') {
-        insights.push({ type: 'success', icon: '📈', text: 'معدلك في تحسّن مستمر — استمر على هذا المنوال!' });
-      } else if (trendDir === 'falling') {
-        insights.push({ type: 'danger', icon: '📉', text: 'معدلك في انخفاض — راجع استراتيجيتك الدراسية.' });
-      }
-      if (dist.excellent > 0) {
-        const pct = Math.round((dist.excellent / allCourses.length) * 100);
-        insights.push({ type: 'info', icon: '🏅', text: `${pct}% من موادك بتقدير ممتاز (A- أو أعلى).` });
-      }
-      if (failed.length > 0) {
-        insights.push({ type: 'danger', icon: '🚨', text: `لديك ${failed.length} مادة راسب — تأكد من الإعادة أو التحسين.` });
-      }
-    }
-
-    return {
-      hasSemesterData,
-      allCourses,
-      strengths,
-      weaknesses,
-      failed,
-      dist,
-      semTrend,
-      bestSem,
-      worstSem,
-      trendDir,
-      goalCalcResults,
-      insights,
-      meta: { currentGpa, earnedHours, targetGpa, totalPoints }
-    };
   }
 
-  // ── 2. GOAL CALCULATOR (single call) ───────────────────────────
+  // ── 2. GOAL CALCULATOR (REMOTE) ───────────────────────────
   /**
    * calcRequiredSGPA(currentGpa, earnedHours, totalPoints, targetGpa, termHours)
-   * Returns the SGPA needed next semester to reach the target CGPA.
    */
-  function calcRequiredSGPA(currentGpa, earnedHours, totalPoints, targetGpa, termHours) {
-    const pts    = totalPoints || (currentGpa * earnedHours);
-    const S      = parseFloat(termHours) || 15;
-    const target = parseFloat(targetGpa);
-    const needed = ((target * (earnedHours + S)) - pts) / S;
-    return {
-      needed:   +Math.min(5, Math.max(0, needed)).toFixed(2),
-      feasible: needed <= 5.0 && needed >= 0,
-      impossible: needed > 5.0,
-      easy:     needed <= 2.5
-    };
+  async function calcRequiredSGPA(currentGpa, earnedHours, totalPoints, targetGpa, termHours) {
+    try {
+      const baseUrl = window.AGENT_BASE_URL || 'http://localhost:8000';
+      const token = await (window.UQUAuth?.getToken?.() || Promise.resolve(null));
+
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch(`${baseUrl}/api/diagnostics/calculate-goal`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ currentGpa, earnedHours, totalPoints, targetGpa, termHours })
+      });
+
+      if (!res.ok) throw new Error('فشل الحساب من الخادم');
+      return await res.json();
+    } catch (err) {
+      console.error('Goal Calc Error:', err);
+      return { needed: 0, feasible: false, impossible: true };
+    }
   }
 
   // ── 3. GRADE DISTRIBUTION CHART HTML ──────────────────────────

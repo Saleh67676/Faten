@@ -1,74 +1,13 @@
 /**
  * ================================================================
- * UQU ACADEMIC ASSISTANT — University News Module v2.0
- * Displays curated UQU news with RSS upgrade when online.
- * Works on file:// and http(s):// protocols.
+ * UQU ACADEMIC ASSISTANT — University News Module v3.0 (Thin Client)
+ * Fetches curated UQU news from the FastAPI backend.
+ * Public API: window.UQUNews.renderNews()
  * ================================================================
  */
 
-(function () {
+(function (window) {
   'use strict';
-
-  var NEWS_CACHE_KEY = 'uqu_news_cache';
-  var NEWS_CACHE_TTL = 30 * 60 * 1000; // 30 min
-  var RSS_PROXY      = 'https://api.rss2json.com/v1/api.json?rss_url=';
-  // UQU X (Twitter) handle for official news
-  var UQU_X_HANDLE   = 'UmmAlQuraUniv';
-  var UQU_X_URL      = 'https://x.com/' + UQU_X_HANDLE;
-  // Multiple RSS sources to try (fallback chain)
-  var RSS_SOURCES    = [
-    'https://uqu.edu.sa/news/rss',
-    'https://uqu.edu.sa/rss',
-    // Nitter mirror for X timeline (RSS-able, free)
-    'https://nitter.net/' + UQU_X_HANDLE + '/rss'
-  ];
-  var MAX_ITEMS      = 6;
-
-  // ── Curated fallback — always available offline ──
-  var FALLBACK_NEWS = [
-    {
-      title: '@UmmAlQuraUniv — حساب الجامعة الرسمي على إكس',
-      description: 'تابع آخر الأخبار والإعلانات الرسمية من جامعة أم القرى مباشرة عبر منصة إكس.',
-      link: UQU_X_URL,
-      date: new Date().toISOString(),
-      category: 'إكس'
-    },
-    {
-      title: 'التقويم الأكاديمي — الفصل الدراسي الثاني 1447هـ',
-      description: 'تعرف على مواعيد بداية الدراسة والاختبارات والإجازات الرسمية لهذا الفصل.',
-      link: 'https://uqu.edu.sa/academic-calendar',
-      date: new Date().toISOString(),
-      category: 'تقويم'
-    },
-    {
-      title: 'بوابة القبول والتسجيل — جامعة أم القرى',
-      description: 'آخر الإعلانات المتعلقة بالقبول والتسجيل وتأجيل الفصول الدراسية.',
-      link: 'https://uqu.edu.sa/admission',
-      date: new Date().toISOString(),
-      category: 'قبول'
-    },
-    {
-      title: 'الخدمات الإلكترونية للطلاب',
-      description: 'تصفح كل الخدمات الإلكترونية المتاحة: السجل الأكاديمي، الحذف والإضافة، وغيرها.',
-      link: 'https://uqu.edu.sa/eservices',
-      date: new Date().toISOString(),
-      category: 'خدمات'
-    },
-    {
-      title: 'المكتبة الرقمية — موارد البحث العلمي',
-      description: 'استفد من قواعد البيانات والمراجع الإلكترونية المتاحة عبر مكتبة الجامعة.',
-      link: 'https://uqu.edu.sa/lib',
-      date: new Date().toISOString(),
-      category: 'مكتبة'
-    },
-    {
-      title: 'برنامج الإرشاد الأكاديمي',
-      description: 'تواصل مع مرشدك الأكاديمي للحصول على نصائح حول خطتك الدراسية وتحسين أدائك.',
-      link: 'https://uqu.edu.sa',
-      date: new Date().toISOString(),
-      category: 'إرشاد'
-    }
-  ];
 
   var categoryColors = {
     'تقويم': 'var(--accent)',
@@ -82,8 +21,12 @@
     'أخبار': 'var(--accent)'
   };
 
+  function _getBackendBase() {
+    return window.AGENT_BASE_URL || 'http://localhost:8000';
+  }
+
   // ── Render news cards into the grid ──
-  function renderNews(items) {
+  function _renderNewsHTML(items) {
     var grid = document.getElementById('uquNewsGrid');
     if (!grid) return;
 
@@ -114,116 +57,29 @@
     }).join('');
   }
 
-  // ── Try one RSS source via proxy ──
-  function fetchOneSource(rssUrl, cb) {
-    var controller = null;
-    var timeoutId = null;
+  async function renderNews() {
     try {
-      controller = new AbortController();
-      timeoutId = setTimeout(function () { try { controller.abort(); } catch(_){} }, 6000);
-    } catch (e) {}
-
-    var fetchOpts = {};
-    if (controller) fetchOpts.signal = controller.signal;
-
-    fetch(RSS_PROXY + encodeURIComponent(rssUrl), fetchOpts)
-      .then(function (res) {
-        if (timeoutId) clearTimeout(timeoutId);
-        if (!res.ok) throw new Error('http_' + res.status);
-        return res.json();
-      })
-      .then(function (data) {
-        if (data && data.status === 'ok' && data.items && data.items.length) {
-          var isX = rssUrl.indexOf('nitter') !== -1 || rssUrl.indexOf('twitter') !== -1;
-          var items = data.items.slice(0, MAX_ITEMS).map(function (item) {
-            var desc = (item.description || item.content || '')
-              .replace(/<[^>]*>/g, '')
-              .replace(/\s+/g, ' ')
-              .trim()
-              .slice(0, 160);
-            // For X posts, rewrite link to x.com (more reliable than nitter)
-            var link = item.link || '#';
-            if (isX && link) {
-              link = link.replace(/https?:\/\/(www\.)?nitter\.[^\/]+/i, 'https://x.com');
-            }
-            return {
-              title: (item.title || '').slice(0, 120) || (isX ? 'تحديث من حساب الجامعة' : 'خبر'),
-              description: desc,
-              link: link,
-              date: item.pubDate || new Date().toISOString(),
-              category: isX ? 'إكس' : ((item.categories && item.categories[0]) || 'أخبار')
-            };
-          });
-          cb(items);
-        } else {
-          cb(null);
-        }
-      })
-      .catch(function () {
-        if (timeoutId) clearTimeout(timeoutId);
-        cb(null);
+      const response = await fetch(_getBackendBase() + '/api/news', {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' }
       });
-  }
-
-  // ── Try to fetch from RSS sources in order; first success wins ──
-  function tryFetchRSS(callback) {
-    // Skip fetch on file:// protocol
-    if (location.protocol === 'file:') {
-      callback(null);
-      return;
+      if (!response.ok) throw new Error('News fetch failed');
+      const data = await response.json();
+      if (data && data.items) {
+        _renderNewsHTML(data.items);
+      }
+    } catch (err) {
+      console.warn('[UQUNews] Fetch error:', err);
     }
-
-    // Check localStorage cache
-    try {
-      var cached = JSON.parse(localStorage.getItem(NEWS_CACHE_KEY) || 'null');
-      if (cached && Date.now() - cached.ts < NEWS_CACHE_TTL && cached.items && cached.items.length) {
-        callback(cached.items);
-        return;
-      }
-    } catch (e) {}
-
-    // Sequentially try each source until one succeeds
-    var i = 0;
-    function tryNext() {
-      if (i >= RSS_SOURCES.length) {
-        callback(null);
-        return;
-      }
-      var src = RSS_SOURCES[i++];
-      fetchOneSource(src, function (items) {
-        if (items && items.length) {
-          try {
-            localStorage.setItem(NEWS_CACHE_KEY, JSON.stringify({ ts: Date.now(), items: items, src: src }));
-          } catch (e) {}
-          callback(items);
-        } else {
-          tryNext();
-        }
-      });
-    }
-    tryNext();
   }
 
-  // ── Init ──
-  function init() {
-    var grid = document.getElementById('uquNewsGrid');
-    if (!grid) return;
-
-    // Render fallback immediately so user sees content right away
-    renderNews(FALLBACK_NEWS);
-
-    // Then try to upgrade with live RSS data
-    tryFetchRSS(function (liveItems) {
-      if (liveItems && liveItems.length) {
-        renderNews(liveItems);
-      }
-    });
-  }
+  // Preserve public API
+  window.UQUNews = { renderNews };
 
   // Run on DOM ready
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function () { setTimeout(init, 200); });
+    document.addEventListener('DOMContentLoaded', function () { setTimeout(renderNews, 200); });
   } else {
-    setTimeout(init, 200);
+    setTimeout(renderNews, 200);
   }
-})();
+})(window);

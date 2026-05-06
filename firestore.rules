@@ -6,19 +6,17 @@ service cloud.firestore {
     function isOwner(uid) { return isSignedIn() && request.auth.uid == uid; }
 
     // ── Users ──
-    match /users/{userId} {
+    // The blanket `{document=**}` recursive wildcard below grants the owner
+    // access to EVERY sub-collection under their user document so we don't
+    // need to enumerate (academic_records, completed_sessions, achievements,
+    // semesters, transcripts, study_plans, exams, notifications, chat_history,
+    // chat_history/*/messages, etc.) — adding a new sub-collection in code
+    // will Just Work without a rules redeploy.
+    match /users/{userId}/{document=**} {
       allow read, write: if isOwner(userId);
-
-      match /transcripts/{id}  { allow read, write: if isOwner(userId); }
-      match /study_plans/{id}  { allow read, write: if isOwner(userId); }
-      match /exams/{id}        { allow read, write: if isOwner(userId); }
-      match /notifications/{id}{ allow read, write: if isOwner(userId); }
-      match /chat_history/{id} {
-        allow read, write: if isOwner(userId);
-        match /messages/{msgId}{ allow read, write: if isOwner(userId); }
-      }
     }
 
+    // Default deny for everything else.
     match /{document=**} { allow read, write: if false; }
   }
 }

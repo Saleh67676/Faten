@@ -7,1812 +7,102 @@
 
 (function () {
   'use strict';
-
-  // =================================================================
-  // 1. SYSTEM UTILITIES & HELPER CLASSES
-  // =================================================================
-
-  const Utils = {
-    $: (sel, ctx = document) => ctx.querySelector(sel),
-    $$: (sel, ctx = document) => Array.from(ctx.querySelectorAll(sel)),
-
-    createElement: (tag, className, text = '') => {
-      const el = document.createElement(tag);
-      if (className) el.className = className;
-      if (text) el.textContent = text;
-      return el;
-    },
-
-    Storage: {
-      get: (key, fallback) => {
-        try {
-          const item = localStorage.getItem(key);
-          return item ? JSON.parse(item) : fallback;
-        } catch (e) {
-          return fallback;
-        }
-      },
-      set: (key, value) => {
-        try {
-          localStorage.setItem(key, JSON.stringify(value));
-        } catch (e) {}
-      },
-      remove: (key) => localStorage.removeItem(key)
-    },
-
-    debounce: (func, wait) => {
-      let timeout;
-      return function (...args) {
-        clearTimeout(timeout);
-        timeout = setTimeout(() => func.apply(this, args), wait);
-      };
-    },
-
-    random: (min, max) => Math.floor(Math.random() * (max - min + 1) + min)
-  };
-
-  // =================================================================
-  // 2. UI MANAGER (THEME, TOASTS, ANIMATIONS)
-  // =================================================================
-
-  class UIManager {
+  class ChatController {
     constructor() {
-      window.__ui = this;
-      this.init();
-    }
-
-    init() {
-      // ── Delegate to UQUCore (single implementations) ──
       const C = window.UQUCore;
-      if (C) {
-        C.Theme.init();
-        C.initHeaderScroll();
-        C.initMobileNav();
-        C.stampYear();
-        C.observeReveal('.animate-block');
-      } else {
-        // Graceful fallback when core hasn't loaded yet
-        this._legacyInit();
-      }
+      this.profile   = C ? C.getProfile() : Utils.Storage.get('uqu_profile_v2', null);
+      this.planState = C ? C.getPlan()    : Utils.Storage.get('uqu_plan_v5', null);
+
+      this.studentName  = this.profile?.basic?.name  || null;
+      this.studentMajor = this.profile?.basic?.major || null;
+
+      this.box     = document.getElementById('chatBox');
+      this.input   = document.getElementById('chatInput');
+      this.sendBtn = document.getElementById('sendMsg');
+      this.typing  = document.getElementById('typing');
+      this.chips   = document.getElementById('quickChips');
+
+      this.bindEvents();
     }
 
-    /** Called only if UQUCore is not available (should never happen in production) */
-    _legacyInit() {
-      const saved = Utils.Storage.get('uqu_theme', 'auto');
-      document.body.setAttribute('data-theme', saved);
-      const btn = Utils.$('#themeToggle');
-      if (btn) btn.addEventListener('click', () => this.toggleTheme());
-      const yearSpan = Utils.$('#year');
-      if (yearSpan) yearSpan.textContent = new Date().getFullYear();
-    }
-
-    showToast(message, type = 'info') {
-      // Delegate to UQUCore.toast (single impl)
-      if (window.UQUCore?.toast) {
-        window.UQUCore.toast(message, type);
-        return;
-      }
-    }
-
-    setTheme(mode) { window.UQUCore?.Theme.set(mode) ?? document.body.setAttribute('data-theme', mode); }
-    toggleTheme()  { window.UQUCore?.Theme.toggle(); }
-  }
-// =================================================================
-// 3. DASHBOARD CONTROLLER (مرتبط بالبروفايل والخطة والمهام)
-// =================================================================
-
-class DashboardController {
-  constructor() {
-    const page = document.body?.dataset?.page;
-    if (page !== 'dashboard') return;
-
-    // ── Single accessor — no more triple-fallback ──
-    const C = window.UQUCore;
-    this.profile   = C ? C.getProfile()  : Utils.Storage.get('uqu_profile_v2', null);
-    this.planState = C ? C.getPlan()     : (Utils.Storage.get('uqu_plan_v5', null) || { plan: [], tasks: [], weeks: 0 });
-
-    this.refs = {
-      currentGpa:   Utils.$('#dashCurrentGpa'),
-      gpaDelta:     Utils.$('#dashGpaDelta'),
-      expectedGpa:  Utils.$('#dashExpectedGpa'),
-      expectedHint: Utils.$('#dashExpectedHint'),
-      hoursValue:   Utils.$('#dashHoursValue'),
-      hoursText:    Utils.$('#dashHoursText'),
-      alertsCount:  Utils.$('#dashAlertsCount'),
-      alertsText:   Utils.$('#dashAlertsText'),
-      courseGoals:  Utils.$('#dashCourseGoals'),
-      upcomingList: Utils.$('#dashUpcomingList'),
-      yearSpan:     Utils.$('#year'),
-      // New smart dashboard refs
-      insights:     Utils.$('#dashInsights'),
-      greeting:     Utils.$('#dash-greeting'),
-      streakNum:    Utils.$('#streak-num'),
-      streakNum2:   Utils.$('#streak-num-2'),
-      gpaGapChip:   Utils.$('#gpa-gap-chip'),
-      examCountdowns:Utils.$('#exam-countdowns'),
-      examLabel:    Utils.$('#exam-countdowns-label'),
-    };
-
-    this.initOverview();
-    this.initUpcoming();
-    this.initGoals();
-    this.initChart();
-    this.initGreeting();
-    this.initInsights();
-    this.initExamCountdown();
-    this.initStreakDisplay();
-
-    if (this.refs.yearSpan) {
-      this.refs.yearSpan.textContent = new Date().getFullYear();
-    }
-
-    // ── DataBridge: Sync GPA from gpa_data → profile on dashboard load ──
-    if (window.DataBridge) {
-      window.DataBridge.syncProfileFromGpa();
-      window.DataBridge.on('profile:updated', () => {
-        this.profile = window.DataBridge.getProfile()?._raw || this.profile;
-        this.initOverview();
-        this.initInsights();
-        this.initExamCountdown();
-      });
-      window.DataBridge.on('task:added', () => {
-        this.planState = Utils.Storage.get('uqu_plan_v5', null) || this.planState;
-        this.initUpcoming();
-      });
-    }
-
-    // ── Listen for AI updates from chat page (cross-tab BroadcastChannel) ──
-    try {
-      this._bc = new BroadcastChannel('uqu_sync');
-      this._bc.onmessage = () => this._refreshAll();
-    } catch(e) {}
-
-    // ── Cross-tab storage event (fallback when BroadcastChannel unavailable) ──
-    // Fires in OTHER tabs when localStorage changes — covers AI tasks created
-    // in chat.html showing up on dashboard.html instantly.
-    window.addEventListener('storage', (e) => {
-      if (!e.key) return;
-      const watched = [
-        'uqu_plan_v5', 'uqu_plan_v5_ping',
-        'uqu_profile_v2',
-        'uqu_exams', 'uqu_exams_ping',
-        'uqu_notifications'
-      ];
-      if (watched.indexOf(e.key) !== -1) {
-        this._refreshAll();
-      }
-    });
-
-    // ── Refresh on visibility (returning to dashboard tab) ──
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') this._refreshAll();
-    });
-
-    // ── Listen for Firestore real-time events (Zero-Refresh UX) ──
-    window.addEventListener('uqu:profileUpdated', () => {
-      this.profile = Utils.Storage.get('uqu_profile_v2', null);
-      this._refreshAll();
-    });
-    window.addEventListener('uqu:examsUpdated', () => this._refreshExams());
-    window.addEventListener('uqu:planUpdated', () => {
-      this.planState = Utils.Storage.get('uqu_plan_v5', null) || this.planState;
-      this.initUpcoming();
-    });
-    window.addEventListener('uqu:notificationsUpdated', (e) => {
-      // Update notification badge if it exists
-      const badge = Utils.$('#notif-badge') || Utils.$('.notif-badge');
-      if (badge && e.detail?.unreadCount !== undefined) {
-        badge.textContent = e.detail.unreadCount;
-        badge.style.display = e.detail.unreadCount > 0 ? '' : 'none';
-      }
-    });
-
-    // ── Full refresh when Firestore sync completes (login/page load) ──
-    window.addEventListener('uqu:firebaseReady', () => {
-      // Small delay to let localStorage cache settle
-      setTimeout(() => {
-        this.profile = Utils.Storage.get('uqu_profile_v2', null);
-        this.planState = Utils.Storage.get('uqu_plan_v5', null) || { plan: [], tasks: [], weeks: 0 };
-        this._refreshAll();
-      }, 300);
-    });
-  }
-
-  _refreshAll() {
-    this.profile   = Utils.Storage.get('uqu_profile_v2', null);
-    this.planState = Utils.Storage.get('uqu_plan_v5', null) || { plan: [], tasks: [], weeks: 0 };
-    this.initOverview();
-    this.initUpcoming();
-    this.initGoals();
-    this.initChart();          // ← re-render GPA progress chart on each refresh
-    this.initGreeting();
-    this.initInsights();
-    this.initExamCountdown();
-    this.initStreakDisplay();
-  }
-
-  _refreshExams() {
-    this.initExamCountdown();
-    this.initUpcoming();
-    this.initInsights();
-  }
-
-  // ----------------- كروت المعدل + الساعات + التنبيهات -----------------
-
-  initOverview() {
-    const goals = this.profile?.goals || {};
-    const currentGpa = goals.currentGpa ?? null;
-    const targetGpa  = goals.targetGpa  ?? null;
-
-    // المعدل الحالي — لون يعكس مستوى المعدل دلالياً
-    if (this.refs.currentGpa) {
-      this.refs.currentGpa.textContent =
-        currentGpa != null && !Number.isNaN(currentGpa)
-          ? Number(currentGpa).toFixed(2)
-          : '—';
-      // تلوين ديناميكي: أخضر > 4، أزرق 3-4، برتقالي 2-3، أحمر < 2
-      if (currentGpa != null && !Number.isNaN(currentGpa)) {
-        const gpaVal = Number(currentGpa);
-        const gpaColor = gpaVal >= 4
-          ? 'var(--success)'
-          : gpaVal >= 3
-            ? 'var(--accent)'
-            : gpaVal >= 2
-              ? 'var(--warning)'
-              : 'var(--danger)';
-        this.refs.currentGpa.style.color = gpaColor;
-      }
-    }
-
-    // المعدل المتوقع
-    if (this.refs.expectedGpa) {
-      const exp =
-        targetGpa != null && !Number.isNaN(targetGpa)
-          ? targetGpa
-          : currentGpa;
-      this.refs.expectedGpa.textContent =
-        exp != null && !Number.isNaN(exp) ? Number(exp).toFixed(2) : '—';
-    }
-
-    // الفرق بين الحالي والهدف
-    if (this.refs.gpaDelta) {
-      if (currentGpa != null && targetGpa != null) {
-        const diff = targetGpa - currentGpa;
-        if (Math.abs(diff) < 0.01) {
-          this.refs.gpaDelta.style.color = 'var(--muted)';
-          this.refs.gpaDelta.textContent = 'هدفك يساوي تقريبًا معدلك الحالي.';
-        } else if (diff > 0) {
-          this.refs.gpaDelta.style.color = 'var(--success)';
-          this.refs.gpaDelta.textContent =
-            `تحتاج لرفع معدلك بحوالي +${diff.toFixed(2)} نقطة خلال هذا الفصل.`;
-        } else {
-          this.refs.gpaDelta.style.color = 'var(--accent-2)';
-          this.refs.gpaDelta.textContent =
-            `أنت أعلى من الهدف بحوالي ${Math.abs(diff).toFixed(2)} نقطة.`;
-        }
-      } else {
-        this.refs.gpaDelta.style.color = 'var(--muted)';
-        this.refs.gpaDelta.textContent =
-          'أدخل معدلك الحالي والهدف من صفحة البروفايل / صفحة المعدل.';
-      }
-    }
-
-    if (this.refs.expectedHint) {
-      if (targetGpa != null) {
-        this.refs.expectedHint.textContent =
-          'تم احتساب المعدل المتوقع من هدفك في البروفايل.';
-      } else {
-        this.refs.expectedHint.textContent =
-          'حدد المعدل المستهدف في البروفايل ليظهر هنا.';
-      }
-    }
-
-    // ساعات الخطة الدراسية الفعلية للطالب (مستخرجة من البروفايل + الخطة الدراسية)
-    // الأولوية: الساعات المعتمدة من المواد المسجّلة (الخطة الفعلية) ثم وقت الجلسات المجدولة
-    const planInfo = this.computePlanHours();
-    const { totalHours, weeks, source } = planInfo;
-    if (this.refs.hoursValue) {
-      this.refs.hoursValue.textContent = totalHours.toFixed(1);
-    }
-    if (this.refs.hoursText) {
-      const courses = this.profile?.courses || [];
-      if (!courses.length && (!this.planState || !this.planState.plan || !this.planState.plan.length)) {
-        this.refs.hoursText.textContent =
-          'لا توجد خطة دراسية بعد. أضف موادك من البروفايل أو أنشئ خطة من صفحة الخطة.';
-      } else if (source === 'curriculum') {
-        this.refs.hoursText.textContent =
-          `${totalHours.toFixed(1)} ساعة معتمدة من خطتك الدراسية (${courses.length} مادة).`;
-      } else {
-        this.refs.hoursText.textContent =
-          `إجمالي الساعات المجدولة خلال ${weeks || 1} أسبوع/أسابيع.`;
-      }
-    }
-
-    // تنبيهات: اختبارات خلال 7 أيام قادمة (من البروفايل)
-    const examsInfo = this.computeUpcomingExams();
-    if (this.refs.alertsCount) {
-      this.refs.alertsCount.textContent = examsInfo.count.toString();
-    }
-    if (this.refs.alertsText) {
-      if (!examsInfo.count) {
-        this.refs.alertsText.textContent = 'لا توجد اختبارات خلال 7 أيام قادمة.';
-      } else if (examsInfo.nearestDiffDays === 0) {
-        this.refs.alertsText.textContent =
-          'لديك اختبار اليوم! راجع خطة المذاكرة.';
-      } else {
-        this.refs.alertsText.textContent =
-          `هناك ${examsInfo.count} اختبار/اختبارات خلال 7 أيام. أقربها بعد ${examsInfo.nearestDiffDays} يوم.`;
-      }
-    }
-  }
-
-  computePlanHours() {
-    // PRIORITY 1: Actual student curriculum (registered courses with credit hours)
-    // This reflects the student's real academic plan, not the auto-generated schedule
-    const courses = (this.profile && this.profile.courses) || [];
-    if (courses.length) {
-      const credits = courses.reduce((sum, c) => {
-        const h = Number(c.creditHours || c.credits || c.hours || 0);
-        return sum + (isFinite(h) ? h : 0);
-      }, 0);
-      if (credits > 0) {
-        return {
-          totalHours: credits,
-          weeks: (this.planState && this.planState.weeks) || 0,
-          source: 'curriculum'
-        };
-      }
-    }
-
-    // PRIORITY 2: Fallback to scheduled session minutes (auto-generated plan)
-    const state = this.planState;
-    if (!state || !state.plan || !state.plan.length) {
-      return { totalHours: 0, weeks: (state && state.weeks) || 0, source: 'empty' };
-    }
-
-    let totalMins = 0;
-    state.plan.forEach((t) => {
-      const from = t.time;
-      const to   = t.timeEnd || t.time;
-      if (!from || !to) return;
-      const [h1, m1] = from.split(':').map(Number);
-      const [h2, m2] = to.split(':').map(Number);
-      const startM = h1 * 60 + m1;
-      const endM   = h2 * 60 + m2;
-      if (endM > startM) totalMins += (endM - startM);
-    });
-
-    return {
-      totalHours: totalMins / 60,
-      weeks: this.planState.weeks || 0,
-      source: 'schedule'
-    };
-  }
-
-  computeUpcomingExams() {
-    const courses = this.profile?.courses || [];
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    let count = 0;
-    let nearestDiffDays = null;
-
-    courses.forEach((c) => {
-      if (!c.examDate) return;
-      const d = new Date(c.examDate + 'T00:00:00');
-      const diffDays = Math.round(
-        (d.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
-      );
-      if (diffDays >= 0 && diffDays <= 7) {
-        count++;
-      }
-      if (diffDays >= 0) {
-        if (nearestDiffDays === null || diffDays < nearestDiffDays) {
-          nearestDiffDays = diffDays;
-        }
-      }
-    });
-
-    return { count, nearestDiffDays };
-  }
-
-  // ----------------- أهداف المواد من البروفايل -----------------
-
-  initGoals() {
-    const container = this.refs.courseGoals;
-    if (!container) return;
-
-    const courses = this.profile?.courses || [];
-    container.innerHTML = '';
-
-    if (!courses.length) {
-      container.innerHTML =
-        '<p class="muted" style="font-size:0.85rem;">أضف موادك وأهداف التقدم من صفحة البروفايل ليتم عرضها هنا.</p>';
-      return;
-    }
-
-    // نرتب المواد بالأقل تقدماً (الأهم أولاً)
-    const sorted = [...courses].sort((a, b) => {
-      const aProg = a.currentProgress || 0;
-      const bProg = b.currentProgress || 0;
-      return aProg - bProg;
-    });
-
-    sorted.slice(0, 4).forEach((c) => {
-      const current = Math.max(
-        0,
-        Math.min(100, parseFloat(c.currentProgress) || 0)
-      );
-      const target = Math.max(
-        current,
-        Math.min(100, parseFloat(c.targetProgress) || 100)
-      );
-      const pct = target > 0 ? (current / target) * 100 : current;
-
-      const wrapper = document.createElement('div');
-
-      const header = document.createElement('div');
-      header.style.display = 'flex';
-      header.style.justifyContent = 'space-between';
-      header.style.marginBottom = '8px';
-      header.style.fontWeight = '600';
-
-      const nameSpan = document.createElement('span');
-      nameSpan.textContent = c.name || 'مقرر بدون اسم';
-
-      const valSpan = document.createElement('span');
-      valSpan.style.color = 'var(--accent)';
-      valSpan.textContent = `${Math.round(current)}%`;
-
-      header.appendChild(nameSpan);
-      header.appendChild(valSpan);
-
-      const barOuter = document.createElement('div');
-      barOuter.style.height = '8px';
-      barOuter.style.background = 'var(--border)';
-      barOuter.style.borderRadius = '99px';
-      barOuter.style.overflow = 'hidden';
-
-      const barInner = document.createElement('div');
-      barInner.style.height = '100%';
-      barInner.style.width = `${Math.max(5, Math.min(100, pct))}%`;
-      barInner.style.background = 'var(--accent)';
-      barInner.style.borderRadius = '99px';
-
-      barOuter.appendChild(barInner);
-      wrapper.appendChild(header);
-      wrapper.appendChild(barOuter);
-
-      container.appendChild(wrapper);
-    });
-  }
-
-  // ----------------- مهام قادمة من خطة المذاكرة -----------------
-  // تعتمد على state.plan الذي يولّده initPlanPage الجديد
-// داخل DashboardController class ...
-
-initUpcoming() {
-  const list = this.refs.upcomingList;
-  if (!list) return;
-
-  list.innerHTML = '';
-
-  const state = this.planState;
-  if (!state || !state.plan || !state.plan.length) {
-    list.innerHTML = `
-      <li style="display:flex;flex-direction:column;align-items:center;justify-content:center;
-        padding:20px 12px;gap:8px;text-align:center;list-style:none;">
-        <div style="font-size:1.8rem;opacity:.35;">📋</div>
-        <div style="font-size:.85rem;font-weight:700;color:var(--muted);">لا توجد مهام مجدولة</div>
-        <a href="plan.html" style="color:var(--accent);font-weight:700;font-size:.8rem;">أنشئ خطتك الآن →</a>
-      </li>`;
-    return;
-  }
-
-  const now = new Date();
-  // لا نصفر الثواني هنا لكي نكون دقيقين، لكن للمقارنة العامة لا بأس
-
-  // فلترة وترتيب المهام
-  const futureTasks = state.plan
-    .map((t) => {
-      let effectiveDateStr = t.date;
-      let effectiveTimeStr = t.time;
-
-      // لو المهمة يدوية وعندها موعد تسليم/اختبار نستخدم الـ deadline
-      if (t.kind === 'manual' && t.deadlineDate) {
-        effectiveDateStr = t.deadlineDate;
-        effectiveTimeStr = t.deadlineTime || t.time;
-      }
-
-      if (!effectiveDateStr || !effectiveTimeStr) return null;
-
-      const dt = new Date(effectiveDateStr + 'T' + effectiveTimeStr + ':00');
-      return {
-        ...t,
-        _dt: dt,
-        _isDeadline: !!t.deadlineDate
-      };
-    })
-    .filter((t) => {
-      if (!t) return false;
-      if (t._dt < now) return false;
-      const diffMs = t._dt.getTime() - now.getTime();
-      const diffDays = diffMs / (1000 * 60 * 60 * 24);
-      // 👇 فقط ما هو خلال 7 أيام قادمة
-      return diffDays <= 7;
-    })
-    .sort((a, b) => a._dt - b._dt)
-    .slice(0, 4);
-
-
-  if (!futureTasks.length) {
-    list.innerHTML = `
-      <li style="display:flex;flex-direction:column;align-items:center;justify-content:center;
-        padding:20px 12px;gap:8px;text-align:center;list-style:none;">
-        <div style="font-size:1.8rem;opacity:.35;">✅</div>
-        <div style="font-size:.85rem;font-weight:700;color:var(--muted);">لا توجد مهام خلال الأسبوع القادم</div>
-        <a href="plan.html" style="color:var(--accent);font-weight:700;font-size:.8rem;">إضافة مهام →</a>
-      </li>`;
-    return;
-  }
-
-  futureTasks.forEach((t) => {
-    const li = document.createElement('li');
-    li.style.display = 'flex';
-    li.style.justifyContent = 'space-between';
-    li.style.alignItems = 'center';
-    li.style.padding = '10px';
-    li.style.background = 'var(--bg)';
-    li.style.borderRadius = '12px';
-    li.style.marginBottom = '8px';
-    li.style.border = '1px solid var(--border)';
-
-    // الجانب الأيمن (اللون والعنوان)
-    const left = document.createElement('div');
-    left.style.display = 'flex';
-    left.style.gap = '10px';
-    left.style.alignItems = 'center';
-
-    const dot = document.createElement('span');
-    dot.style.width = '10px';
-    dot.style.height = '10px';
-    dot.style.borderRadius = '50%';
-    dot.style.background = t.courseColor || 'var(--accent)';
-    // تغيير شكل النقطة إذا كانت واجب أو اختبار
-    if (t.type === 'exam' || t.type === 'project') {
-       dot.style.borderRadius = '2px'; // مربع للمشاريع
-    }
-
-    const infoDiv = document.createElement('div');
-    infoDiv.style.display = 'flex';
-    infoDiv.style.flexDirection = 'column';
-
-    const title = document.createElement('span');
-    title.style.fontSize = '0.9rem';
-    title.style.fontWeight = '600';
-    title.textContent = t.title || t.courseName || 'مهمة';
-
-    const subTitle = document.createElement('span');
-    subTitle.style.fontSize = '0.75rem';
-    subTitle.style.color = 'var(--muted)';
-    // عرض نوع المهمة
-    const typeAr = t.type === 'exam' ? 'اختبار' : t.type === 'assignment' ? 'واجب' : t.type === 'project' ? 'مشروع' : 'مذاكرة';
-    subTitle.textContent = t._isDeadline ? `تسليم/موعد: ${typeAr}` : typeAr;
-
-    infoDiv.appendChild(title);
-    infoDiv.appendChild(subTitle);
-
-    left.appendChild(dot);
-    left.appendChild(infoDiv);
-
-    // الجانب الأيسر (الوقت المتبقي أو التاريخ)
-    const right = document.createElement('div');
-    right.style.textAlign = 'left';
-    
-    const dateOptions = { weekday: 'short', month: 'short', day: 'numeric' };
-    const dateText = t._dt.toLocaleDateString('ar-SA', dateOptions);
-    const timeText = t._dt.toLocaleTimeString('ar-SA', { hour: '2-digit', minute:'2-digit' });
-
-    // حساب الفرق بالأيام
-    const diffTime = Math.abs(t._dt - now);
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
-    
-    let badgeColor = 'var(--muted)';
-    let badgeText = dateText;
-
-    if (diffDays <= 1) {
-        badgeText = diffDays === 0 ? 'اليوم' : 'غداً';
-        badgeColor = 'var(--warning)';
-    } else if (diffDays <= 3) {
-        badgeColor = 'var(--accent)';
-    }
-
-    right.innerHTML = `
-        <div style="font-size:0.8rem; font-weight:bold; color:${badgeColor}">${badgeText}</div>
-        <div style="font-size:0.7rem; color:var(--muted)">${timeText}</div>
-    `;
-
-    li.appendChild(left);
-    li.appendChild(right);
-
-    list.appendChild(li);
-  });
-}
-
-  // ─── Personalised greeting ───
-  initGreeting() {
-    const el = this.refs.greeting;
-    if (!el) return;
-    const name = this.profile?.basic?.name || this.profile?.name || null;
-    const hour = new Date().getHours();
-    const tod  = hour < 12 ? 'صباح الخير' : hour < 17 ? 'مساء الخير' : 'مساء النور';
-    el.textContent = name ? `${tod}، ${name}! إليك ملخص أدائك الأكاديمي.` : `${tod}! إليك ملخص أدائك الأكاديمي.`;
-  }
-
-  // ─── Smart Insights panel ───
-  initInsights() {
-    const el = this.refs.insights;
-    if (!el) return;
-
-    const goals   = this.profile?.goals   || {};
-    const courses = this.profile?.courses || [];
-    const plan    = this.planState;
-
-    const insights = [];
-
-    // 1) GPA gap insight
-    const curr  = parseFloat(goals.currentGpa);
-    const tgt   = parseFloat(goals.targetGpa);
-    if (!isNaN(curr) && !isNaN(tgt)) {
-      const diff = tgt - curr;
-      if (diff > 0.5) {
-        insights.push({ icon:'📈', bg:'rgba(99,102,241,.1)', type:'info',
-          title:'مسافة عن الهدف', body:`تحتاج +${diff.toFixed(2)} نقطة للوصول للهدف.`,
-          href:'gpa.html' });
-        if (this.refs.gpaGapChip) {
-          this.refs.gpaGapChip.className = 'insight-chip warning';
-          this.refs.gpaGapChip.textContent = `${diff.toFixed(2)} نقطة للهدف`;
-          this.refs.gpaGapChip.style.display = 'inline-flex';
-        }
-      } else if (diff <= 0) {
-        insights.push({ icon:'🏆', bg:'rgba(16,185,129,.1)', type:'success',
-          title:'تجاوزت هدفك!', body:'معدلك الحالي يساوي أو يتجاوز الهدف. أحسنت!',
-          href:'gpa.html' });
-      } else {
-        insights.push({ icon:'🎯', bg:'rgba(99,102,241,.1)', type:'info',
-          title:'قريب من الهدف', body:`تحتاج +${diff.toFixed(2)} فقط للوصول للمستهدف.`,
-          href:'gpa.html' });
-      }
-    } else {
-      insights.push({ icon:'📊', bg:'rgba(99,102,241,.1)', type:'info',
-        title:'أدخل بياناتك', body:'أضف معدلك الحالي والهدف للحصول على تحليل دقيق.',
-        href:'profile.html' });
-    }
-
-    // 1b) Diagnostics-based insights (requires uqu_semesters data)
-    try {
-      if (window.UQUDiagnostics) {
-        const sems = JSON.parse(localStorage.getItem('uqu_semesters') || '[]');
-        if (sems.length > 0) {
-          const diag = window.UQUDiagnostics.generateDiagnostics(sems, courses, goals);
-          // Trend insight
-          if (diag.trendDir === 'rising') {
-            insights.push({ icon:'🚀', bg:'rgba(16,185,129,.1)', type:'success',
-              title:'مسارك في تحسّن مستمر',
-              body:`معدلك يرتفع عبر الفصول. استمر! أفضل فصل: ${diag.bestSem?.name || '—'} (${diag.bestSem?.gpa?.toFixed(2) || '—'}).`,
-              href:'gpa.html' });
-          } else if (diag.trendDir === 'falling') {
-            insights.push({ icon:'⚠️', bg:'rgba(245,158,11,.1)', type:'warning',
-              title:'انتبه: معدلك في تراجع',
-              body:`حدث انخفاض في المعدل خلال الفصول الأخيرة. راجع مواد الضعف.`,
-              href:'gpa.html' });
+    bindEvents() {
+      if (this.sendBtn) this.sendBtn.addEventListener('click', () => this.handleSend());
+      if (this.input) {
+        this.input.addEventListener('keypress', (e) => {
+          if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            this.handleSend();
           }
-          // Weaknesses insight
-          if (diag.weaknesses?.length > 0) {
-            const wkNames = diag.weaknesses.slice(0,2).map(c => c.name).join(' · ');
-            insights.push({ icon:'🔴', bg:'rgba(239,68,68,.1)', type:'danger',
-              title:`${diag.weaknesses.length} مادة تحتاج تحسيناً`,
-              body: wkNames,
-              href:'gpa.html' });
-          }
-          // Strengths insight
-          if (diag.strengths?.length > 0) {
-            insights.push({ icon:'⭐', bg:'rgba(16,185,129,.1)', type:'success',
-              title:`${diag.strengths.length} مادة بتقدير ممتاز`,
-              body: diag.strengths.slice(0,2).map(c => c.name).join(' · '),
-              href:'gpa.html' });
-          }
-        }
-      }
-    } catch(e) { /* diagnostics unavailable, skip */ }
-
-    // 2) Plan insight
-    const sessions = plan?.plan?.length ?? 0;
-    if (!sessions) {
-      insights.push({ icon:'📅', bg:'rgba(245,158,11,.1)', type:'warning',
-        title:'لا توجد خطة دراسية', body:'أنشئ خطة مذاكرة ذكية لتنظيم وقتك.',
-        href:'plan.html' });
-    } else {
-      const weeklyAvg = sessions / Math.max(plan?.weeks || 1, 1);
-      insights.push({ icon:'📅', bg:'rgba(6,182,212,.1)', type:'info',
-        title:'معدل الجلسات الأسبوعية', body:`${weeklyAvg.toFixed(1)} جلسة / أسبوع عبر ${sessions} جلسة إجمالاً.`,
-        href:'plan.html' });
-    }
-
-    // 3) Exam insight
-    const urgentExams = courses.filter(c => {
-      if (!c.examDate) return false;
-      const days = Math.round((new Date(c.examDate+'T00:00:00') - new Date()) / 86400000);
-      return days >= 0 && days <= 3;
-    });
-    if (urgentExams.length) {
-      insights.push({ icon:'🚨', bg:'rgba(239,68,68,.1)', type:'danger',
-        title:`${urgentExams.length} اختبار خلال 3 أيام!`,
-        body: urgentExams.slice(0,2).map(c=>c.name).join(' · '),
-        href:'plan.html' });
-    } else if (courses.length) {
-      const nextExam = courses
-        .filter(c => c.examDate)
-        .map(c => ({ name:c.name, days: Math.round((new Date(c.examDate+'T00:00:00') - new Date()) / 86400000) }))
-        .filter(c => c.days >= 0)
-        .sort((a,b) => a.days - b.days)[0];
-      if (nextExam) {
-        insights.push({ icon:'⏰', bg:'rgba(245,158,11,.1)', type:'warning',
-          title:'أقرب اختبار', body:`${nextExam.name} — بعد ${nextExam.days} يوم.`,
-          href:'plan.html' });
-      }
-    } else {
-      insights.push({ icon:'✅', bg:'rgba(16,185,129,.1)', type:'success',
-        title:'لا اختبارات قريبة', body:'أضف مواداتك من البروفايل لتتبع مواعيد الاختبارات.',
-        href:'profile.html' });
-    }
-
-    const typeColor = { info:'var(--accent)', warning:'var(--warning)', danger:'var(--danger)', success:'var(--success)' };
-    el.innerHTML = insights.map(ins => `
-      <a href="${ins.href}" style="text-decoration:none;" class="dash-insight-item">
-        <div class="dash-insight-icon" style="background:${ins.bg};">${ins.icon}</div>
-        <div>
-          <div style="font-weight:700;font-size:.82rem;color:${typeColor[ins.type]||'var(--fg)'};margin-bottom:3px;">${ins.title}</div>
-          <div style="font-size:.77rem;color:var(--muted);line-height:1.5;">${ins.body}</div>
-        </div>
-      </a>
-    `).join('');
-  }
-
-  // ─── Exam countdown cards ───
-  initExamCountdown() {
-    const el    = this.refs.examCountdowns;
-    const label = this.refs.examLabel;
-    if (!el) return;
-
-    const courses = this.profile?.courses || [];
-    const upcoming = courses
-      .filter(c => c.examDate)
-      .map(c => {
-        const days = Math.round((new Date(c.examDate+'T00:00:00') - new Date()) / 86400000);
-        return { ...c, days };
-      })
-      .filter(c => c.days >= 0)
-      .sort((a,b) => a.days - b.days)
-      .slice(0, 4);
-
-    if (label) label.textContent = `${upcoming.length} قادم`;
-
-    if (!upcoming.length) {
-      el.innerHTML = `
-        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;
-          padding:20px 12px;gap:8px;text-align:center;">
-          <div style="font-size:1.8rem;opacity:.35;">⏰</div>
-          <div style="font-size:.85rem;font-weight:700;color:var(--muted);">لا توجد اختبارات قادمة</div>
-          <a href="profile.html" style="color:var(--accent);font-weight:700;font-size:.8rem;">أضف مواد من البروفايل →</a>
-        </div>`;
-      return;
-    }
-
-    el.innerHTML = upcoming.map(c => {
-      const urgent = c.days <= 2;
-      const warn   = c.days <= 7;
-      const color  = urgent ? 'var(--danger)' : warn ? 'var(--warning)' : 'var(--accent)';
-      const bg     = urgent ? 'rgba(239,68,68,.08)' : warn ? 'rgba(245,158,11,.08)' : 'var(--surface-2)';
-      const label  = c.days === 0 ? 'اليوم!' : c.days === 1 ? 'غداً!' : `${c.days} يوم`;
-      return `
-        <div style="display:flex;align-items:center;gap:12px;padding:11px 14px;
-          border-radius:12px;background:${bg};border:1px solid ${urgent?'rgba(239,68,68,.2)':warn?'rgba(245,158,11,.15)':'var(--border)'};">
-          <div style="text-align:center;min-width:44px;">
-            <div style="font-size:1.4rem;font-weight:900;color:${color};line-height:1;">${c.days}</div>
-            <div style="font-size:.65rem;color:var(--muted);font-weight:700;">يوم</div>
-          </div>
-          <div style="flex:1;min-width:0;">
-            <div style="font-weight:700;font-size:.84rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${c.name}</div>
-            <div style="font-size:.75rem;color:${color};font-weight:800;">${label}</div>
-          </div>
-          ${urgent ? '<span class="insight-chip danger" style="padding:3px 8px;font-size:.7rem;">عاجل</span>' : ''}
-        </div>
-      `;
-    }).join('');
-  }
-
-  // ─── Streak display ───
-  initStreakDisplay() {
-    const streak = window.UQUX?.StudyStreak?.get?.() ?? { streak: 0, total: 0, days: [] };
-    const s1 = Utils.$('#streak-num');
-    const s2 = Utils.$('#streak-num-2');
-    if (s1) s1.textContent = streak.streak || '0';
-    if (s2) s2.textContent = streak.streak || '0';
-  }
-
-  // ─── Chart ───
-  initChart() {
-    const placeholder = Utils.$('.chart-placeholder');
-    if (!placeholder) return;
-
-    const goals = this.profile?.goals || {};
-    const hasGpa = goals.currentGpa != null && !Number.isNaN(Number(goals.currentGpa));
-
-    // Empty state when no GPA data yet
-    if (!hasGpa) {
-      placeholder.innerHTML =
-        '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;' +
-        'height:100%;min-height:180px;text-align:center;color:var(--muted);gap:10px;padding:20px;">' +
-          '<div style="font-size:2.4rem;opacity:.45;">📈</div>' +
-          '<div style="font-size:.9rem;font-weight:600;color:var(--fg-2);">لا يوجد معدل تراكمي بعد</div>' +
-          '<div style="font-size:.78rem;">' +
-            'أضف معدلك من <a href="profile.html" style="color:var(--accent);font-weight:700;">البروفايل</a> ' +
-            'لرؤية مسارك نحو الهدف.' +
-          '</div>' +
-        '</div>';
-      return;
-    }
-
-    // Use UQUCharts if available (modern engine)
-    if (window.UQUCharts?.renderGpaChart) {
-      placeholder.id = placeholder.id || 'gpa-chart-container';
-      placeholder.innerHTML = ''; // clear empty state
-      window.UQUCharts.renderGpaChart(placeholder.id, this.profile);
-      return;
-    }
-
-    // Fallback: basic canvas
-    placeholder.innerHTML = '';
-    const canvas = document.createElement('canvas');
-    canvas.style.cssText = 'width:100%;height:100%;display:block;';
-    placeholder.appendChild(canvas);
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    const resize = () => {
-      const dpr  = window.devicePixelRatio || 1;
-      const rect = placeholder.getBoundingClientRect();
-      canvas.width  = rect.width  * dpr;
-      canvas.height = rect.height * dpr;
-      canvas.style.width  = rect.width  + 'px';
-      canvas.style.height = rect.height + 'px';
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      this.renderChart(ctx, rect.width, rect.height);
-    };
-    resize();
-    window.addEventListener('resize', Utils.debounce(resize, 200));
-  }
-
-  renderChart(ctx, w, h) {
-    ctx.clearRect(0, 0, w, h);
-
-    const goals   = this.profile?.goals || {};
-    const current = goals.currentGpa || 3.5;
-    const target  = goals.targetGpa  || current;
-
-    // نولّد نقاط بسيطة تمثل تطور المعدل نحو الهدف
-    const dataPoints = [];
-    const baseStart = Math.max(1.5, current - 0.6);
-    dataPoints.push(baseStart);
-    dataPoints.push(baseStart + 0.15);
-    dataPoints.push(baseStart + 0.25);
-    dataPoints.push(current - 0.05);
-    dataPoints.push(current);
-    dataPoints.push(current + (target - current) * 0.4);
-    dataPoints.push(current + (target - current) * 0.7);
-    dataPoints.push(target);
-
-    const maxVal = 5;
-    const padTop = 20;
-    const usableH = h - padTop - 10;
-    const stepX = w / (dataPoints.length - 1);
-
-    // تعبئة متدرجة
-    const gradient = ctx.createLinearGradient(0, padTop, 0, h);
-    gradient.addColorStop(0, 'rgba(99, 102, 241, 0.4)');
-    gradient.addColorStop(1, 'rgba(99, 102, 241, 0.0)');
-
-    ctx.beginPath();
-    ctx.moveTo(0, h);
-    dataPoints.forEach((pt, i) => {
-      const x = i * stepX;
-      const y = padTop + (1 - pt / maxVal) * usableH;
-      ctx.lineTo(x, y);
-    });
-    ctx.lineTo(w, h);
-    ctx.closePath();
-    ctx.fillStyle = gradient;
-    ctx.fill();
-
-    // الخط
-    ctx.beginPath();
-    ctx.strokeStyle = '#6366f1';
-    ctx.lineWidth = 3;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    dataPoints.forEach((pt, i) => {
-      const x = i * stepX;
-      const y = padTop + (1 - pt / maxVal) * usableH;
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    });
-    ctx.stroke();
-
-    // النقاط
-    ctx.fillStyle = '#ffffff';
-    ctx.strokeStyle = '#6366f1';
-    dataPoints.forEach((pt, i) => {
-      const x = i * stepX;
-      const y = padTop + (1 - pt / maxVal) * usableH;
-      ctx.beginPath();
-      ctx.arc(x, y, 5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-    });
-  }
-}
-
-// =================================================================
-// 4. CHAT CONTROLLER (SMART LOCAL BRAIN v4.0 + UQUActions)
-// =================================================================
-
-class ChatController {
-  constructor() {
-    const page = document.body?.dataset?.page;
-    if (page !== 'chat') return;
-
-    this.input   = Utils.$('#chatInput');
-    this.sendBtn = Utils.$('#sendMsg');
-    this.box     = Utils.$('#chatBox');
-    this.typing  = Utils.$('#typing');
-    this.chips   = Utils.$('#quickChips');
-
-    // ── Single accessor ──
-    const C = window.UQUCore;
-    this.profile   = C ? C.getProfile() : Utils.Storage.get('uqu_profile_v2', null);
-    this.planState = C ? C.getPlan()    : Utils.Storage.get('uqu_plan_v5', null);
-
-    this.studentName  = this.profile?.basic?.name  || null;
-    this.studentMajor = this.profile?.basic?.major || null;
-
-    // حالة المحادثة (للتدفق التفاعلي مثل احسب معدلي)
-    this.flowState = {
-      current: null,      // 'gpa_collect' مثلاً
-      gpaDraft: []        // { courseName, score }
-    };
-
-    // 🧠 دماغ يعتمد على Regex
-    this.brainRegex = this.initBrain();
-
-    this.defaultResponses = [
-      'سؤال جميل 🤔 حاول توضّحه أكثر أو تربطه بموادك / جدولك.',
-      'ممكن توضح سؤالك أكثر: هل تقصد الخطة، المعدل، أو القاعات؟',
-      'أنا أشتغل على بيانات بروفايلك وخطتك. جرّب تسأل: “إيش عندي اليوم؟” أو “هل عندي اختبار قريب؟”.',
-      'لو كان سؤالك عن الجامعة أو الدراسة، حاول تذكر اسم المادة أو نوع الاختبار.'
-    ];
-
-    this.bindEvents();
-  }
-
-  // =========================================================
-  // 0) إعداد الدماغ المعتمد على Regex
-  // =========================================================
-  initBrain() {
-    return [
-      {
-        pattern: /(سلام|هلا|مرحبا|اهلا|أهلا|هاي)/i,
-        reply: () => {
-          const greet = this.getGreetingByTime();
-          const base = this.studentName
-            ? `${greet} ${this.studentName}! 🌹`
-            : `${greet} يا هلا! 🌹`;
-          const options = [
-            `${base} كيف أقدر أساعدك اليوم؟`,
-            `${base} جاهز نرتب دراستك وجدولك.`,
-            'وعليكم السلام! نورت المساعد الأكاديمي 👋'
-          ];
-          return this.pick(options);
-        }
-      },
-      {
-        pattern: /(شكرا|تسلم|يعطيك العافيه|يعطيك العافية|ما قصرت|ثانك)/i,
-        reply: () => this.pick([
-          'على الرحب والسعة! هذا واجبي 🫡',
-          'الله يعافيك! إذا عندك أي سؤال ثاني أنا حاضر.',
-          'بالخدمة دائماً، وموفّق في دراستك 🤍'
-        ])
-      },
-      {
-        pattern: /(من انت|مين انت|عرف بنفسك|اسمك)/i,
-        reply: () => this.pick([
-          'أنا <strong>المساعد الأكاديمي الذكي</strong>، أستخدم بيانات البروفايل والخطة عشان أساعدك تنظم دراستك.',
-          'أنا مساعد مبني على الذكاء الاصطناعي، ومربوط بنظامك الأكاديمي المحلي. قريباً أرتبط مباشرةً بـ API من OpenAI لأجاوب على أسئلتك العلمية بالتفصيل.'
-        ])
-      },
-      {
-        pattern: /(معدل|gpa|احسب معدلي|كم معدلي|حساب المعدل)/i,
-        reply: () => this.startGpaFlow()
-      },
-      {
-        pattern: /(قاعة|مبنى|مكان|وين القاعه|وين القاعة|موقع القاعة)/i,
-        reply: () => this.pick([
-          'للعثور على أي قاعة، افتح صفحة <strong><a href="locations.html">مواقع القاعات</a></strong> واكتب رقم القاعة مثل 21-0.534.',
-          'صفحة <strong><a href="locations.html">القاعات</a></strong> فيها خريطة بسيطة تساعدك توصل لقاعة محاضرتك.',
-          'لو عطيتني رقم القاعة هنا، أقدر أوضح لك وصفاً عامّاً، لكن التحديد الدقيق بيكون من صفحة القاعات.'
-        ])
-      },
-      {
-        pattern: /(خطة|خطة دراسيه|خطة دراسية|مذاكرة|تنظيم وقت|جدول مذاكرة)/i,
-        reply: () => this.pick([
-          'أفضل طريقة هي تستخدم صفحة <strong><a href="plan.html">الخطة الدراسية</a></strong> المبنية على بروفايلك الذكي.',
-          'الخطة تعتمد على أوقات فراغك وموادك. تأكد أولاً أن البروفايل مكتمل، ثم اضغط توليد الخطة من صفحة الخطة.',
-          'أقدر ألخّص لك الخطة هنا في الشات (مثل: “إيش عندي اليوم؟”)، لكن التعديل الأساسي يكون من صفحة الخطة.'
-        ])
-      }
-    ];
-  }
-
-  // =========================================================
-  // 1) ربط الأحداث
-  // =========================================================
-  bindEvents() {
-    if (this.sendBtn) {
-      this.sendBtn.addEventListener('click', () => this.handleSend());
-    }
-
-    if (this.input) {
-      this.input.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-          e.preventDefault();
-          this.handleSend();
-        }
-      });
-
-      this.input.addEventListener('input', function () {
-        this.style.height = 'auto';
-        this.style.height = this.scrollHeight + 'px';
-        if (this.value === '') this.style.height = 'auto';
-      });
-    }
-
-    if (this.chips) {
-      if (window.UQUCore?.delegate) {
-        window.UQUCore.delegate(this.chips, 'click', '.suggestion-pill', (e, el) => {
-          const txt = el.textContent.replace(/[\u{1F600}-\u{1F6FF}]/gu, '').trim();
-          this.handleSend(txt);
         });
-      } else {
+      }
+      if (this.chips) {
         this.chips.addEventListener('click', (e) => {
           if (e.target.classList.contains('suggestion-pill')) {
-            const txt = e.target.textContent.replace(/[\u{1F600}-\u{1F6FF}]/gu, '').trim();
-            this.handleSend(txt);
+            this.handleSend(e.target.textContent.trim());
           }
         });
       }
     }
-  }
 
-  // =========================================================
-  // 2) إضافة رسائل للواجهة
-  // =========================================================
-  addMessage(text, role) {
-    if (!this.box) return;
-    const row = Utils.createElement(
-      'div',
-      `msg-row ${role === 'user' ? 'me' : 'bot'}`
-    );
-    const avatar =
-      role === 'user'
-        ? '<div class="avatar user-avatar">👤</div>'
-        : '<div class="avatar bot-avatar">🤖</div>';
+    async handleSend(text) {
+      const val = (text || this.input?.value || '').trim();
+      if (!val) return;
+      if (this.input) this.input.value = '';
+      
+      this.addMessage(val, 'user');
+      
+      if (window.UQUAIChat) {
+        const row = this._createBotRow();
+        const bubble = row.querySelector('.bubble');
+        if (this.typing) this.typing.style.display = 'block';
 
-    row.innerHTML = `
-      ${avatar}
-      <div class="bubble">${text}</div>
-    `;
-
-    this.box.appendChild(row);
-    this.box.scrollTo({ top: this.box.scrollHeight, behavior: 'smooth' });
-  }
-
-  // =========================================================
-  // 3) إرسال الرسالة
-  // =========================================================
-  handleSend(textOverride = null) {
-    if (!this.input) return;
-    if (this._isProcessing) return;
-    const val = textOverride || this.input.value.trim();
-    if (!val) return;
-
-    this.addMessage(val, 'user');
-    this.input.value = '';
-    this.input.style.height = 'auto';
-
-    // Disable send while processing
-    this._isProcessing = true;
-    if (this.sendBtn) this.sendBtn.disabled = true;
-
-    // Show typing
-    if (this.typing) {
-      this.typing.style.display = 'flex';
-      if (this.box) this.box.appendChild(this.typing);
-      if (this.box) this.box.scrollTop = this.box.scrollHeight;
-    }
-
-    // ── Try Claude API first ──────────────────────────────
-    if (window.UQUAIChat) {
-      // Create empty bubble for streaming
-      const row = this._createBotRow();
-      const bubble = row.querySelector('.bubble');
-
-      window.UQUAIChat.send(
-        val,
-        bubble,  // typewriter target
-        (fullReply, actions) => {
+        window.UQUAIChat.send(val, bubble, (fullReply, actions) => {
           if (this.typing) this.typing.style.display = 'none';
-          // Render interactive widgets (maps, exam cards, plan cards, GPA)
           if (window.ChatWidgets) {
             const widgetHtml = window.ChatWidgets.renderWidgets(fullReply || '', actions || [], val);
             if (widgetHtml) {
               const widgetDiv = document.createElement('div');
               widgetDiv.className = 'chat-widgets-container';
-              widgetDiv.style.cssText = 'display:block;width:100%;margin-top:10px;';
               widgetDiv.innerHTML = widgetHtml;
               bubble.appendChild(widgetDiv);
             }
           }
-          if (this.box) this.box.scrollTop = this.box.scrollHeight;
           this._doneProcessing();
-        },
-        (apiErr) => {
-          // API failed AND offline → fall back to local brain
-          if (!navigator.onLine) {
-            bubble.innerHTML = '';
-            const localReply = this.analyzeAndReply(val);
-            if (window.typewriter) {
-              window.typewriter(bubble, localReply, () => { this._doneProcessing(); });
-            } else {
-              bubble.innerHTML = localReply;
-              this._doneProcessing();
-            }
-          } else {
-            // Online API error — ai.js already rendered the error message in bubble
-            this._doneProcessing();
-          }
-        }
-      );
-      return;
-    }
-
-    // ── Fallback: local brain only ────────────────────────
-    const DELAY = 600 + Math.random() * 400;
-    setTimeout(() => {
-      if (this.typing) this.typing.style.display = 'none';
-      const reply = this.analyzeAndReply(val);
-      this.addMessage(reply, 'bot');
-      this._doneProcessing();
-    }, DELAY);
-  }
-
-  _doneProcessing() {
-    this._isProcessing = false;
-    if (this.sendBtn) this.sendBtn.disabled = false;
-    if (this.input) this.input.focus();
-  }
-
-  _createBotRow() {
-    const row = document.createElement('div');
-    row.className = 'msg-row bot';
-    row.innerHTML = `<div class="avatar bot-avatar" aria-hidden="true">🤖</div><div class="bubble"></div>`;
-    row.style.animation = 'msgIn 0.4s cubic-bezier(0.34,1.56,0.64,1) forwards';
-    if (this.typing) {
-      this.typing.style.display = 'none';
-    }
-    if (this.box) {
-      if (this.typing && this.typing.parentNode === this.box) {
-        this.box.insertBefore(row, this.typing);
-      } else {
-        this.box.appendChild(row);
-      }
-      this.box.scrollTop = this.box.scrollHeight;
-    }
-    return row;
-  }
-
-  // =========================================================
-  // 4) تحليل السؤال والرد (Intents + Flows + Brain + Default)
-  // =========================================================
-  analyzeAndReply(input) {
-    const raw = (input || '').trim();
-    const normalized = this.normalizeText(raw);
-
-    // تحديث البيانات من التخزين كل مرة (لو تغيّر شيء من صفحات ثانية)
-    const C = window.UQUCore;
-    this.profile   = C ? C.getProfile() : Utils.Storage.get('uqu_profile_v2', null);
-    this.planState = C ? C.getPlan()    : Utils.Storage.get('uqu_plan_v5', null);
-
-    // 1) لو في Flow نشط (مثل جمع درجات المعدل)
-    const flowReply = this.handleActiveFlow(normalized, raw);
-    if (flowReply) return flowReply;
-
-    // 2) Intents خاصة بالخطة والجدول
-    if (this.isTodayPlanIntent(normalized)) {
-      return this.replyTodaySessions();
-    }
-
-    if (this.isTomorrowPlanIntent(normalized)) {
-      return this.replyTomorrowSessions();
-    }
-
-    if (this.isWeekOverviewIntent(normalized)) {
-      return this.replyWeekOverview();
-    }
-
-    if (this.isNextSessionIntent(normalized)) {
-      return this.replyNextSession();
-    }
-
-    if (this.isUpcomingExamsIntent(normalized)) {
-      return this.replyUpcomingExams();
-    }
-
-    if (this.isProfileSummaryIntent(normalized)) {
-      return this.replyProfileSummary();
-    }
-
-    // 3) Intents تفعل أفعال حقيقية عبر UQUActions
-    const actionReply = this.handleActionIntents(normalized, raw);
-    if (actionReply) return actionReply;
-
-    // 4) دماغ Regex عام
-    for (const rule of this.brainRegex) {
-      if (rule.pattern?.test(normalized)) {
-        return typeof rule.reply === 'function'
-          ? rule.reply()
-          : rule.reply;
-      }
-    }
-
-    // 5) لا يوجد تطابق → رد افتراضي
-    return this.pick(this.defaultResponses);
-  }
-
-  // =========================================================
-  // 5) Intents بسيطة
-  // =========================================================
-  isTodayPlanIntent(text) {
-    return /ايش عندي اليوم|وش عندي اليوم|جدولي اليوم|اليوم عندي ايش|اليوم ش عندي/.test(text);
-  }
-
-  isTomorrowPlanIntent(text) {
-    return /بكرا ايش عندي|بكره ايش عندي|غدا ايش عندي|غداً ايش عندي|جدولي بكره|جدولي بكرا/.test(text);
-  }
-
-  isWeekOverviewIntent(text) {
-    return /هذا الاسبوع|هذا الأسبوع|الاسبوع هذا|الأسبوع هذا|جدول الاسبوع|خطة الاسبوع/.test(text);
-  }
-
-  isNextSessionIntent(text) {
-    return /ايش بعد شوي|وش بعد شوي|الجلسة الجاية|المحاضرة الجاية|وش التالي|ايش التالي/.test(text);
-  }
-
-  isUpcomingExamsIntent(text) {
-    return /(اختبار|امتحان).*(قريب|الاسبوع|الأسبوع|جاي|جاية)/.test(text);
-  }
-
-  isProfileSummaryIntent(text) {
-    return /(بروفايل|ملفي|بياناتي|ملخص البروفايل)/.test(text);
-  }
-
-  // =========================================================
-  // 6) Intents تنفّذ أفعال (UQUActions)
-  // =========================================================
-  handleActionIntents(normalized, raw) {
-    // ❗ إذا ما فيه UQUActions (ملف ما تحمّل)
-    if (!window.UQUActions) return null;
-
-    // 6.1 سوي لي خطة دراسية
-    if (/سوي لي خطة|سويلي خطة|ابغى خطة دراسية|ابغا خطة دراسية|ابي خطة دراسية|سوي خطة دراسية/.test(normalized)) {
-      const planState = window.UQUActions.generatePlanFromProfile();
-      const count = (planState.plan || []).length;
-
-      if (!count) {
-        return 'حاولت أنشئ خطة من البروفايل، لكن ما لقيت مواد أو بيانات كافية. تأكد إنك عبّيت البروفايل ثم جرّب مرة ثانية من صفحة <strong><a href="profile.html">البروفايل</a></strong>.';
-      }
-
-      const first = planState.plan[0];
-      const firstDay  = first?.day || 'اليوم الأول';
-      const firstDate = first?.date || '';
-      const greet = this.getGreetingByTime();
-
-      return `${greet}! ✅ أنشأت لك خطة دراسية ذكية من بروفايلك.<br>
-عدد جلسات المذاكرة في الخطة: <strong>${count}</strong> جلسة.<br>
-أول جلسة عندك في: <strong>${firstDay}</strong> (${firstDate}) — ${first.time || ''}.<br><br>
-تقدر تشوف الجدول كامل وتعدّل عليه من صفحة <strong><a href="plan.html">الخطة الدراسية</a></strong>.`;
-    }
-
-    // 6.2 تسجيل درجة: "جبت 85 في قواعد البيانات" أو "جبت في قواعد البيانات 85"
-    const pattern1 = /جبت\s+(\d{1,3})\s+في\s+(.+)/;      // جبت 85 في قواعد البيانات
-    const pattern2 = /جبت\s+في\s+(.+?)\s+(\d{1,3})/;     // جبت في قواعد البيانات 85
-
-    let m = pattern1.exec(raw);
-    if (!m) m = pattern2.exec(raw);
-
-    if (m) {
-      const score = pattern1.test(raw) ? m[1] : m[2];
-      const courseName = pattern1.test(raw) ? m[2].trim() : m[1].trim();
-
-      const result = window.UQUActions.recordGrade({
-        courseName,
-        score: Number(score)
-      });
-
-      if (!result.ok) {
-        return `حاولت أسجّل درجة <strong>${score}</strong> للمادة <strong>${courseName}</strong> لكن ما وجدتها في بروفايلك 😕<br>تأكد إن اسم المادة في البروفايل مطابق تماماً، ثم جرّب مرة ثانية.`;
-      }
-
-      const gpaTxt = result.gpa
-        ? result.gpa.toFixed(2)
-        : 'غير محسوب';
-
-      return `تم ✅ تسجيل درجة <strong>${score}</strong> للمادة <strong>${result.course.name}</strong> في بروفايلك.<br>المعدل التقريبي الحالي (من 5): <strong>${gpaTxt}</strong>.<br>تقدر تشوف المواد والدرجات من صفحة <strong><a href="dashboard.html">الداشبورد</a></strong> أو صفحة <strong><a href="profile.html">البروفايل</a></strong>.`;
-    }
-
-    // 6.3 نية "أبغى أذاكر يوم الخميس الساعة 5" → إضافة جلسة في الخطة
-    if (/بذاكر|ابذاكر|ذاكر/.test(normalized)) {
-      const dayMatch = /(الاحد|الأحد|الاثنين|الإثنين|الثلاثاء|الاربعاء|الأربعاء|الخميس|الجمعة|السبت)/.exec(normalized);
-      const timeMatch = /(\d{1,2})(?::(\d{1,2}))?\s*(ص|م|am|pm)?/.exec(normalized);
-
-      if (dayMatch && timeMatch) {
-        const dayWord = dayMatch[1];
-        let hour = parseInt(timeMatch[1], 10);
-        const min  = timeMatch[2] ? parseInt(timeMatch[2], 10) : 0;
-        const suffix = (timeMatch[3] || '').toLowerCase();
-
-        // تحويل 12h → 24h بسيط
-        if (suffix === 'م' || suffix === 'pm') {
-          if (hour < 12) hour += 12;
-        } else if (suffix === 'ص' || suffix === 'am') {
-          if (hour === 12) hour = 0;
-        }
-
-        const timeStr = this.pad2(hour) + ':' + this.pad2(min);
-
-        // تاريخ أول يوم قادم من هذا اليوم
-        const targetDate = this.getNextWeekdayDate(dayWord);
-        const isoDate = this.toISODate(targetDate);
-
-        const session = window.UQUActions.addStudySession({
-          date: isoDate,
-          time: timeStr,
-          courseId: null,
-          courseName: 'جلسة مذاكرة عامة',
-          place: 'غير محدد'
+        }, (err) => {
+          if (this.typing) this.typing.style.display = 'none';
+          bubble.innerHTML = 'عذراً، حدث خطأ في الاتصال بالخادم. حاول مرة أخرى.';
+          this._doneProcessing();
         });
-
-        return `جميل 👌 أضفت لك جلسة مذاكرة يوم <strong>${session.day}</strong> ${session.date} الساعة <strong>${session.time}</strong> في الخطة الدراسية.<br>تقدر تعدّل المادة والمكان من صفحة <strong><a href="plan.html">الخطة</a></strong>.`;
       }
     }
 
-    return null;
-  }
-
-  // =========================================================
-  // 7) Flows تفاعلية (مثل احسب معدلي)
-  // =========================================================
-startGpaFlow() {
-  this.flowState.current   = 'gpa_collect';
-  this.flowState.gpaBuffer = '';
-
-  return `تمام ✅ نقدر نحسب معدل <strong>متوقّع</strong> من درجاتك المتوقعة في المواد.<br><br>
-أنا أستخدم <strong>عدد الساعات لكل مادة من البروفايل</strong>، لذلك تأكد إن موادك وساعاتها مسجّلة هناك.<br><br>
-اكتب المواد سطر سطر بهذا الشكل:<br>
-<code>برمجة 1: 95</code><br>
-<code>قواعد البيانات: 85</code><br><br>
-تقدر تكتبهم في أكثر من رسالة أو في رسالة واحدة مفصولة بـ <code>|</code> أو بالفواصل.<br>
-وعندما تخلص اكتب كلمة <strong>احسب</strong> أو <strong>خلصت</strong>.`;
-}
-
-
-  handleActiveFlow(normalized, raw) {
-    if (this.flowState.current === 'gpa_collect') {
-
-      this.flowState.gpaBuffer =
-        (this.flowState.gpaBuffer || '') + '\n' + raw.trim();
-
-      const wantCalc = /احسب|خلصت|احسب المعدل|احسبه/.test(normalized);
-      const items = this.parseGpaLines(this.flowState.gpaBuffer);
-
-      // لو طلب الحساب الآن
-      if (wantCalc) {
-        if (!window.UQUActions) {
-          this.flowState.current = null;
-          this.flowState.gpaBuffer = '';
-          return 'حالياً ما أقدر أحسب المعدل لأن طبقة الأفعال (UQUActions) غير متوفرة في الصفحة.';
-        }
-
-        if (!items.length) {
-          this.flowState.current = null;
-          this.flowState.gpaBuffer = '';
-          return 'ما استقبلت أي مواد أو درجات 😅 اكتب مثلاً: <code>برمجة 1: 95</code> ثم كرر لباقي المواد.';
-        }
-
-        const result = window.UQUActions.predictGpaWithHypotheticalScores(items);
-
-        this.flowState.current   = null;
-        this.flowState.gpaBuffer = '';
-
-        if (!result.hours || result.hours <= 0) {
-          return `ما قدرت أحسب المعدل لأن ما عندي مواد كافية في <strong>البروفايل</strong> مع عدد الساعات والدرجات 👀<br>
-تأكد إنك ضفت موادك (اسم المادة + عدد الساعات) من صفحة <strong><a href="profile.html">البروفايل</a></strong>، وبعدين ارجع وجرّب "احسب معدلي" مرة ثانية.`;
-        }
-
-        const gpa = result.gpa || 0;
-        const gpaTxt = gpa.toFixed(2);
-
-        let msg = `حسب الدرجات اللي كتبتها، وبالاعتماد على <strong>عدد الساعات المسجّلة لموادك في البروفايل</strong>، فالمعدل <strong>المتوقَّع</strong> (من 5) هو: <strong>${gpaTxt}</strong>.<br><br>`;
-        msg += 'تقدر تثبّت الدرجات فعلياً في البروفايل من صفحة <strong><a href="dashboard.html">الداشبورد</a></strong> أو صفحة <strong><a href="profile.html">البروفايل</a></strong>.';
-
-        return msg;
-      } // 👈 هذا القوس كان ناقص
-
-      // لسه ما قال احسب → نأكد إننا فهمنا على الأقل مادة واحدة
-      if (!items.length) {
-        return 'ما استقبلت أي مادة بصيغة صحيحة 😅 حاول تكتب بالشكل: <code>برمجة 1: 95</code> أو افصل بين المواد بـ "|" .';
-      }
-
-      // عندنا مواد لكن ما طلب الحساب بعد
-      const last = items[items.length - 1];
-      return `تمام ✅ أضفت:<br><strong>${last.courseName}</strong> = <strong>${last.score}</strong>.<br>أضف باقي المواد أو اكتب <strong>احسب</strong> لما تخلص.`;
-    }
-
-    return null;
-  }
-
-
-  // =========================================================
-  // 8) أدوات مساعدة (Normalize + وقت + تواريخ)
-  // =========================================================
-    // ---------- تحليل درجات المواد من نص (سطر واحد أو عدة أسطر) ----------
-  parseGpaLines(rawText) {
-    if (!rawText) return [];
-
-    // نحول الفواصل و | إلى أسطر
-    let text = rawText
-      .replace(/[\u200f\u200e]/g, '')      // remove RTL marks
-      .replace(/[،;,|]/g, '\n');           // كل فاصل يصبح سطر جديد
-
-    const lines = text
-      .split(/\n+/)
-      .map((l) => l.trim())
-      .filter(Boolean)
-      .filter((l) => !/^(احسب|خلصت|احسب المعدل|احسبه)$/i.test(l));
-
-    const items = [];
-    const re = /^(.+?)\s*[:：]\s*(\d{1,3})(?:\s*%?)?$/; // "اسم المادة: 95"
-
-    for (const line of lines) {
-      const m = line.match(re);
-      if (!m) continue;
-
-      const name  = m[1].trim();
-      const score = Number(m[2]);
-
-      if (!name || isNaN(score)) continue;
-
-      items.push({ courseName: name, score });
-    }
-
-    return items;
-  }
-
-  normalizeText(text) {
-    if (!text) return '';
-
-    let t = text;
-
-    // إزالة التشكيل والإيموجي وبعض الرموز
-    t = t.replace(/[\u0617-\u061A\u064B-\u0652]/g, ''); // تشكيل
-    t = t.replace(/[\u{1F600}-\u{1F6FF}]/gu, '');        // إيموجي
-    t = t.replace(/[^\w\u0600-\u06FF\s:،]/g, ' ');      // رموز غريبة
-    t = t.replace(/\s+/g, ' ').trim();
-
-    // توحيد الألف والهمزات
-    t = t.replace(/[إأآا]/g, 'ا');
-    t = t.replace(/ة/g, 'ه');
-    t = t.replace(/ى/g, 'ي');
-
-    // توحيد بعض العبارات العامية
-    t = t.replace(/ابغا|ابغى|ابغئ/g, 'ابغى');
-    t = t.replace(/ابي/g, 'ابغى');
-    t = t.replace(/بكره/g, 'بكرا');
-
-    return t.toLowerCase();
-  }
-
-  getGreetingByTime() {
-    const now = new Date();
-    const hour = now.getHours(); // يعتمد على توقيت المتصفح
-
-    if (hour < 11) return 'صباح الخير';
-    if (hour < 17) return 'مساء الخير';
-    return 'مساء النور';
-  }
-
-  // ── Delegate to UQUCore.D (single source of truth) ──
-  pad2(n)        { return window.UQUCore ? window.UQUCore.D.pad(n)        : String(n).padStart(2, '0'); }
-  toISODate(d)   { return window.UQUCore ? window.UQUCore.D.toISO(d)      : (d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')); }
-
-  getNextWeekdayDate(dayWord) {
-    if (window.UQUCore) return window.UQUCore.D.nextWeekday(dayWord);
-    // Minimal inline fallback
-    const map = { 'الاحد':0,'الأحد':0,'الاثنين':1,'الإثنين':1,'الثلاثاء':2,'الاربعاء':3,'الأربعاء':3,'الخميس':4,'الجمعة':5,'السبت':6 };
-    const target = map[dayWord] ?? null;
-    const today = new Date();
-    if (target == null) return today;
-    let diff = target - today.getDay();
-    if (diff <= 0) diff += 7;
-    const d = new Date(today); d.setDate(d.getDate() + diff); d.setHours(0,0,0,0); return d;
-  }
-
-  pick(arr) {
-    if (!arr || !arr.length) return '';
-    return arr[Math.floor(Math.random() * arr.length)];
-  }
-
-  // =========================================================
-  // 9) الدوال الخاصة بالردود المعتمدة على الخطة/البروفايل
-  //    (نفس اللي كتبتها قبل + دالة nextSession الجديدة)
-  // =========================================================
-  replyTodaySessions() {
-    if (!this.planState || !this.planState.plan || !this.planState.plan.length) {
-      return 'حالياً ما عندك خطة مجدولة في النظام. افتح صفحة <strong><a href="plan.html">الخطة الدراسية</a></strong> وسوِّ جدول أولاً.';
-    }
-
-    const today = new Date();
-    const iso = this.toISODate(today);
-
-    const todaysTasks = this.planState.plan
-      .filter((t) => t.date === iso)
-      .sort((a, b) => (a.time || '').localeCompare(b.time || ''));
-
-    if (!todaysTasks.length) {
-      return 'حسب الخطة الحالية، ما عندك أي جلسة مذاكرة اليوم 👌';
-    }
-
-    let msg = 'هذه جلساتك لليوم حسب الخطة:<br><br>';
-    todaysTasks.forEach((t) => {
-      msg += `• ${t.time} – ${t.timeEnd || ''} — <strong>${t.courseName}</strong> @ ${t.place || 'غير محدد'}<br>`;
-    });
-
-    msg += '<br>تقدر تعدّل هذه الجلسات من صفحة <strong><a href="plan.html">الخطة</a></strong>.';
-    return msg;
-  }
-
-  replyTomorrowSessions() {
-    if (!this.planState || !this.planState.plan || !this.planState.plan.length) {
-      return 'لا توجد خطة مجدولة حالياً. أنشئ خطة من صفحة الخطة الدراسية أولاً.';
-    }
-
-    const d = new Date();
-    d.setDate(d.getDate() + 1);
-    const iso = this.toISODate(d);
-
-    const tasks = this.planState.plan
-      .filter((t) => t.date === iso)
-      .sort((a, b) => (a.time || '').localeCompare(b.time || ''));
-
-    const dayText = d.toLocaleDateString('ar-SA', {
-      weekday: 'long',
-      month: 'short',
-      day: 'numeric'
-    });
-
-    if (!tasks.length) {
-      return `حسب الخطة الحالية، ما عندك جلسات مذاكرة غداً (${dayText}).`;
-    }
-
-    let msg = `هذه جلساتك غداً (${dayText}):<br><br>`;
-    tasks.forEach((t) => {
-      msg += `• ${t.time} – ${t.timeEnd || ''} — <strong>${t.courseName}</strong> @ ${t.place || 'غير محدد'}<br>`;
-    });
-    msg += '<br>لو حابّ تغيّر الأوقات، عدّلها من صفحة <strong><a href="plan.html">الخطة</a></strong>.';
-    return msg;
-  }
-
-  replyWeekOverview() {
-    if (!this.planState || !this.planState.plan || !this.planState.plan.length) {
-      return 'لا توجد خطة مجدولة للأسبوع. ابدأ بإنشاء خطة من صفحة الخطة الدراسية.';
-    }
-
-    const today = new Date();
-    const start = new Date(today);
-    start.setDate(start.getDate() - start.getDay() + 0); // تقريب الأحد كبداية
-    const end = new Date(start);
-    end.setDate(start.getDate() + 6);
-
-    const isoStart = this.toISODate(start);
-    const isoEnd   = this.toISODate(end);
-
-    const tasks = this.planState.plan.filter((t) => {
-      if (!t.date) return false;
-      return t.date >= isoStart && t.date <= isoEnd;
-    });
-
-    if (!tasks.length) {
-      return 'ما في أي جلسات في هذا الأسبوع داخل الخطة الحالية.';
-    }
-
-    const perDay = {};
-    tasks.forEach((t) => {
-      perDay[t.day] = (perDay[t.day] || 0) + 1;
-    });
-
-    let msg = 'نظرة سريعة على هذا الأسبوع:<br><br>';
-    Object.keys(perDay).forEach((day) => {
-      msg += `• ${day}: ${perDay[day]} جلسة<br>`;
-    });
-    msg += '<br>لرؤية الجدول كاملاً، افتح صفحة <strong><a href="plan.html">الخطة</a></strong>.';
-    return msg;
-  }
-
-  replyUpcomingExams() {
-    const courses = this.profile?.courses || [];
-    if (!courses.length) {
-      return 'لا أرى أي مواد في البروفايل حالياً. أضف موادك في صفحة <strong><a href="profile.html">البروفايل</a></strong> أولاً.';
-    }
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const upcoming = [];
-
-    courses.forEach((c) => {
-      if (!c.examDate) return;
-      const d = new Date(c.examDate + 'T00:00:00');
-      const diffDays = Math.round(
-        (d.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
-      );
-      if (diffDays >= 0 && diffDays <= 30) {
-        upcoming.push({ course: c, diff: diffDays, dateObj: d });
-      }
-    });
-
-    if (!upcoming.length) {
-      return 'حالياً لا يوجد أي اختبار نهائي مرتبط بموادك خلال 30 يوم (حسب البيانات الموجودة في البروفايل).';
-    }
-
-    upcoming.sort((a, b) => a.diff - b.diff);
-
-    let msg = 'هذه أهم الاختبارات القادمة حسب البروفايل:<br><br>';
-    upcoming.slice(0, 5).forEach((x) => {
-      const dateText = x.dateObj.toLocaleDateString('ar-SA', {
-        month: 'short',
-        day: 'numeric',
-        weekday: 'short'
-      });
-      if (x.diff === 0) {
-        msg += `• <strong>${x.course.name}</strong> — اليوم (${dateText}) ⚠️<br>`;
-      } else {
-        msg += `• <strong>${x.course.name}</strong> — بعد ${x.diff} يوم (${dateText})<br>`;
-      }
-    });
-
-    msg += '<br>تأكد من تواريخ الاختبارات في صفحة <strong><a href="profile.html">البروفايل</a></strong> وأضف أي مادة ناقصة.';
-    return msg;
-  }
-
-  replyProfileSummary() {
-    if (!this.profile) {
-      return 'ما عندي بروفايل محفوظ لك حتى الآن. اذهب إلى صفحة <strong><a href="profile.html">البروفايل</a></strong> واملأ بياناتك الأساسية أولاً.';
-    }
-
-    const basic    = this.profile.basic    || {};
-    const learning = this.profile.learning || {};
-    const goals    = this.profile.goals    || {};
-    const courses  = this.profile.courses  || [];
-
-    let msg = 'ملخّص بروفايلك الحالي:<br><br>';
-
-    if (basic.name)     msg += `• الاسم: <strong>${basic.name}</strong><br>`;
-    if (basic.major)    msg += `• التخصص: <strong>${basic.major}</strong><br>`;
-    if (basic.level)    msg += `• المستوى الدراسي: <strong>${basic.level}</strong><br>`;
-    if (basic.semStart) msg += `• بداية الفصل: <strong>${basic.semStart}</strong><br>`;
-    if (basic.weeks)    msg += `• مدة الفصل (أسابيع): <strong>${basic.weeks}</strong><br>`;
-
-    if (learning.focusMinutes || learning.speed) {
-      msg += '<br><strong>أسلوب التعلّم:</strong><br>';
-      if (learning.focusMinutes) {
-        msg += `• مدة الجلسة الواحدة: ${learning.focusMinutes} دقيقة<br>`;
-      }
-      if (learning.speed) {
-        const speedLabel =
-          learning.speed === 'fast'
-            ? 'سريع'
-            : learning.speed === 'slow'
-            ? 'بطيء'
-            : 'متوسط';
-        msg += `• سرعة التعلم: ${speedLabel}<br>`;
+    addMessage(text, side) {
+      const row = document.createElement('div');
+      const sideClass = side === 'user' ? 'me' : 'bot';
+      row.className = `msg-row ${sideClass}`;
+      row.innerHTML = `<div class="avatar ${side}-avatar">${side === 'bot' ? '🤖' : '👤'}</div><div class="bubble">${text}</div>`;
+      if (this.box) {
+        this.box.appendChild(row);
+        this.box.scrollTop = this.box.scrollHeight;
       }
     }
 
-    if (goals.currentGpa || goals.targetGpa) {
-      msg += '<br><strong>الأهداف الدراسية:</strong><br>';
-      if (goals.currentGpa) msg += `• المعدل الحالي: ${goals.currentGpa}<br>`;
-      if (goals.targetGpa)  msg += `• المعدل المستهدف: ${goals.targetGpa}<br>`;
-    }
-
-    msg += `<br>عدد المواد في البروفايل: <strong>${courses.length}</strong> مادة.<br>`;
-    msg += 'للتعديل، ادخل على صفحة <strong><a href="profile.html">البروفايل</a></strong>.';
-
-    return msg;
-  }
-
-  // --------- NEW: المحاضرة / الجلسة القادمة فقط ----------
-  replyNextSession() {
-    const plan = this.planState?.plan || [];
-    if (!plan.length) {
-      return 'ما عندي أي جلسات في الخطة حالياً. أنشئ خطة من صفحة <strong><a href="plan.html">الخطة الدراسية</a></strong> أولاً.';
-    }
-
-    const now = new Date();
-    let next = null;
-    let nextDateObj = null;
-
-    plan.forEach((t) => {
-      if (!t.date || !t.time) return;
-
-      const dt = new Date(`${t.date}T${t.time}:00`);
-      if (dt.getTime() <= now.getTime()) return;
-
-      if (!next || dt.getTime() < nextDateObj.getTime()) {
-        next = t;
-        nextDateObj = dt;
+    _createBotRow() {
+      const row = document.createElement('div');
+      row.className = 'msg-row bot';
+      row.innerHTML = `<div class="avatar bot-avatar">🤖</div><div class="bubble"></div>`;
+      if (this.box) {
+        this.box.appendChild(row);
+        this.box.scrollTop = this.box.scrollHeight;
       }
-    });
-
-    if (!next) {
-      return 'ما في أي جلسة قادمة في الخطة (كل الجلسات المسجّلة انتهت). جرّب تحديث الخطة أو إضافة جلسات جديدة.';
+      return row;
     }
 
-    const diffMs = nextDateObj.getTime() - now.getTime();
-    const diffMinutes = Math.round(diffMs / (1000 * 60));
-    const diffHours = Math.floor(diffMinutes / 60);
-    const remMinutes = diffMinutes % 60;
-
-    let diffText = '';
-    if (diffHours <= 0 && remMinutes <= 0) {
-      diffText = 'تبدأ الآن تقريباً';
-    } else if (diffHours === 0) {
-      diffText = `بعد حوالي <strong>${remMinutes} دقيقة</strong>`;
-    } else {
-      diffText = `بعد حوالي <strong>${diffHours} ساعة و ${remMinutes} دقيقة</strong>`;
+    _doneProcessing() {
+      if (this.sendBtn) this.sendBtn.disabled = false;
+      if (this.input) this.input.focus();
     }
-
-    const dateText = nextDateObj.toLocaleDateString('ar-SA', {
-      weekday: 'long',
-      month: 'short',
-      day: 'numeric'
-    });
-
-    return `الجلسة / المحاضرة القادمة عندك هي:<br><br>
-• المادة: <strong>${next.courseName}</strong><br>
-• اليوم: <strong>${dateText}</strong><br>
-• الوقت: <strong>${next.time}</strong> ${next.timeEnd ? '– ' + next.timeEnd : ''}<br>
-• المكان: ${next.place || 'غير محدد'}<br><br>
-${diffText}.`;
   }
-}
 
   // =================================================================
   // 4-b. USER LEARNING PROFILE CONTROLLER (V1 – اختياري)
@@ -2365,6 +655,275 @@ class GPAController {
         Utils.Storage.set('gpa_data', gpa);
         window.DataBridge.syncProfileFromGpa();
       } catch(e) {}
+    }
+  }
+}
+
+// =================================================================
+// 5.5. UI MANAGER & DASHBOARD CONTROLLER
+// =================================================================
+
+class UIManager {
+  constructor() {
+    this.initTheme();
+    this.initNav();
+    this.initGlobalEffects();
+  }
+
+  initTheme() {
+    const toggle = document.getElementById('themeToggle');
+    if (!toggle) return;
+    const _S = window.UQUCore?.S || localStorage;
+    const current = (_S.getItem && _S.getItem('uqu_theme')) || 'auto';
+    document.body.dataset.theme = current;
+    
+    toggle.addEventListener('click', () => {
+      const next = document.body.dataset.theme === 'dark' ? 'light' : 'dark';
+      document.body.dataset.theme = next;
+      if (_S.setItem) _S.setItem('uqu_theme', next);
+      else localStorage.setItem('uqu_theme', next);
+    });
+  }
+
+  initNav() {
+    const toggle = document.querySelector('.nav-toggle');
+    const menu = document.getElementById('main-menu');
+    if (toggle && menu) {
+      toggle.addEventListener('click', () => {
+        const expanded = toggle.getAttribute('aria-expanded') === 'true';
+        toggle.setAttribute('aria-expanded', !expanded);
+        menu.classList.toggle('active');
+      });
+    }
+  }
+
+  initGlobalEffects() {
+    // Standard ripple/skeleton/lazy init is handled by UQUX
+    if (window.UQUX && typeof window.UQUX.init === 'function') {
+      window.UQUX.init();
+    }
+  }
+}
+
+class DashboardController {
+  constructor() {
+    // Prefer DataBridge (returns flat shape: name/currentGpa/targetGpa/...).
+    // Fall back to raw localStorage so the dashboard renders even before
+    // data-bridge.js / UQUCore have loaded (page-load race).
+    this.profile = (window.DataBridge && window.DataBridge.getProfile())
+      || this._readProfileFlat();
+    this.plan = (window.UQUCore && window.UQUCore.getPlan)
+      ? window.UQUCore.getPlan()
+      : JSON.parse(localStorage.getItem('uqu_plan_v5') || 'null');
+    this.render();
+  }
+
+  _readProfileFlat() {
+    try {
+      const raw = JSON.parse(localStorage.getItem('uqu_profile_v2') || 'null');
+      if (!raw) return null;
+      const b = raw.basic || {}, g = raw.goals || {}, l = raw.learning || {};
+      // Compute the academic level from the number of completed semesters
+      // when it's not explicitly set (e.g. 11 completed → level 12).
+      let level = b.level || raw.level || '';
+      if (!level) {
+        const semesters = (() => {
+          try { return JSON.parse(localStorage.getItem('uqu_semesters') || '[]') || []; }
+          catch { return []; }
+        })();
+        const completed = semesters.filter(s =>
+          s.status === 'completed' || (s.courses || []).some(c => c.grade)
+        ).length;
+        if (completed > 0) level = String(completed + 1);
+      }
+      return {
+        name: b.name || raw.name || '',
+        major: b.major || raw.major || '',
+        level,
+        currentGpa: parseFloat(g.currentGpa ?? raw.currentGpa) || 0,
+        targetGpa: parseFloat(g.targetGpa ?? raw.targetGpa) || 0,
+        earnedHours: parseInt(g.earnedHours ?? raw.earnedHours) || 0,
+        planHours: parseInt(g.planHours ?? raw.planHours) || 0,
+        courses: raw.courses || [],
+        completedCourses: raw.completedCourses || [],
+        learning: l
+      };
+    } catch { return null; }
+  }
+
+  render() {
+    const p = this.profile || {};
+
+    // Greeting
+    const greetEl = document.getElementById('dash-greeting');
+    if (greetEl) {
+      const h = new Date().getHours();
+      const txt = h < 12 ? 'صباح الخير' : h < 18 ? 'مساء الخير' : 'ليلة سعيدة';
+      greetEl.textContent = `${txt}${p.name ? '، ' + p.name : ''}! كيف حال دراستك اليوم؟`;
+    }
+
+    // Main Stats
+    const curGpa = document.getElementById('dashCurrentGpa');
+    if (curGpa) curGpa.textContent = p.currentGpa ? p.currentGpa.toFixed(2) : '0.00';
+
+    const targetGpa = document.getElementById('dashExpectedGpa');
+    if (targetGpa) targetGpa.textContent = p.targetGpa ? p.targetGpa.toFixed(2) : '—';
+
+    // Plan-hours card: show TOTAL plan hours (e.g. 187) — earned hours
+    // already have their own readout in the GPA modal. Falls back to
+    // scheduled-session hours from the active plan if planHours is missing.
+    const hoursVal = document.getElementById('dashHoursValue');
+    if (hoursVal) {
+      let scheduled = 0;
+      const sessions = (this.plan && (this.plan.plan || this.plan.tasks)) || [];
+      sessions.forEach(s => {
+        if (!s.time || !s.timeEnd) { scheduled += 60; return; }
+        const [h1,m1] = String(s.time).split(':').map(Number);
+        const [h2,m2] = String(s.timeEnd).split(':').map(Number);
+        const d = ((h2||0)*60 + (m2||0)) - ((h1||0)*60 + (m1||0));
+        scheduled += d > 0 ? d : 60;
+      });
+      const scheduledHours = Math.round(scheduled / 60);
+      hoursVal.textContent = String(p.planHours || scheduledHours || p.earnedHours || 0);
+    }
+
+    // Course Progress
+    const courseProgress = document.getElementById('dashCourseGoals');
+    if (courseProgress && p.courses && p.courses.length) {
+      courseProgress.innerHTML = p.courses.slice(0, 3).map(c => `
+        <div class="course-prog">
+          <div style="display:flex;justify-content:space-between;font-size:0.75rem;margin-bottom:4px;">
+            <span>${c.name}</span>
+            <span>${c.currentProgress || 0}%</span>
+          </div>
+          <div style="height:5px;background:var(--border);border-radius:10px;overflow:hidden;">
+            <div style="width:${c.currentProgress || 0}%;height:100%;background:var(--accent);"></div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // Upcoming tasks
+    const upcomingList = document.getElementById('dashUpcomingList');
+    if (upcomingList && this.plan && this.plan.plan) {
+      const tasks = this.plan.plan.slice(0, 3);
+      if (tasks.length) {
+        upcomingList.innerHTML = tasks.map(t => `
+          <li style="padding:10px;background:var(--surface-2);border-radius:10px;margin-bottom:8px;display:flex;align-items:center;gap:12px;">
+            <div style="font-size:1.1rem;">${t.kind==='study'?'📚':'📝'}</div>
+            <div style="flex:1;">
+              <div style="font-size:0.8rem;font-weight:700;">${t.title}</div>
+              <div style="font-size:0.7rem;color:var(--muted);">${t.day} • ${t.time}</div>
+            </div>
+          </li>
+        `).join('');
+      } else {
+        upcomingList.innerHTML = '<p class="muted" style="font-size:0.75rem;text-align:center;">لا توجد جلسات مجدولة حالياً.</p>';
+      }
+    }
+
+    // GPA trend chart, inline insights, activity heatmap
+    this.renderGpaChart();
+    this.renderInlineInsights();
+    this.renderHeatmap();
+  }
+
+  // ── GPA trend chart (uses semester history when available) ──
+  renderGpaChart() {
+    const el = document.getElementById('dashGpaChart');
+    if (!el) return;
+    let semesters = [];
+    try { semesters = JSON.parse(localStorage.getItem('uqu_semesters') || '[]') || []; }
+    catch (_) { semesters = []; }
+
+    const points = semesters
+      .map(s => parseFloat(s.cgpa ?? s.gpa))
+      .filter(v => !isNaN(v) && v > 0);
+    const labels = semesters.map((s, i) => s.name || s.nameAr || `ف${i+1}`);
+
+    el.innerHTML = '';
+    if (points.length >= 2 && window.UQUCharts) {
+      try {
+        window.UQUCharts.createChart('line', 'dashGpaChart',
+          { values: points, labels, target: this.profile.targetGpa || null },
+          { duration: 900 });
+        return;
+      } catch (e) { console.warn('[Dashboard] chart failed:', e); }
+    }
+    if (window.UQUCharts && this.profile.currentGpa) {
+      try {
+        window.UQUCharts.renderGpaChart('dashGpaChart', {
+          goals: { currentGpa: this.profile.currentGpa, targetGpa: this.profile.targetGpa },
+          basic: { weeks: 16 }
+        });
+        return;
+      } catch (e) { /* fall through */ }
+    }
+    el.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--muted);font-size:.85rem;text-align:center;padding:20px;">📊 سجّل فصولك السابقة من <a href="gpa.html" style="color:var(--accent);font-weight:700;">صفحة المعدل</a> ليظهر مسارك.</div>';
+  }
+
+  // ── Inline smart insights (top 3 cards) ──
+  renderInlineInsights() {
+    const wrap = document.getElementById('dashInsights');
+    if (!wrap) return;
+
+    const p = this.profile;
+    const courses = p.courses || [];
+    const insights = [];
+
+    if (p.currentGpa && p.targetGpa) {
+      const diff = p.targetGpa - p.currentGpa;
+      if (diff <= 0) insights.push({ icon: '🏆', color: 'var(--success)', text: 'تجاوزت معدلك المستهدف!', sub: 'أداء ممتاز — حافظ عليه.' });
+      else if (diff <= 0.2) insights.push({ icon: '🔥', color: 'var(--accent)', text: `قريب من هدفك بفرق ${diff.toFixed(2)}`, sub: 'دفعة بسيطة وتوصل.' });
+      else insights.push({ icon: '📈', color: 'var(--warning)', text: `الفجوة ${diff.toFixed(2)} نقطة عن الهدف`, sub: `هدفك ${p.targetGpa.toFixed(2)} — ركّز على المواد الصعبة.` });
+    }
+
+    if (p.earnedHours && p.planHours) {
+      const pct = Math.round((p.earnedHours / p.planHours) * 100);
+      const remain = p.planHours - p.earnedHours;
+      insights.push({
+        icon: '📊', color: pct >= 80 ? 'var(--success)' : 'var(--accent)',
+        text: `أنجزت ${pct}% من خطتك (${p.earnedHours}/${p.planHours})`,
+        sub: remain > 0 ? `${remain} ساعة متبقية للتخرج.` : 'اكتملت الساعات!'
+      });
+    }
+
+    if (courses.length) {
+      const hard = courses.filter(c => c.difficulty === 'hard');
+      if (hard.length) {
+        insights.push({
+          icon: '💪', color: 'var(--warning)',
+          text: `${hard.length} مادة صعبة هذا الفصل`,
+          sub: hard.slice(0, 2).map(c => c.name).join('، ')
+        });
+      } else {
+        insights.push({
+          icon: '🎯', color: 'var(--success)',
+          text: `${courses.length} مادة في الفصل الحالي`,
+          sub: 'وزّع وقتك بحكمة بين المواد.'
+        });
+      }
+    }
+
+    if (!insights.length) {
+      wrap.innerHTML = '<div class="dash-insight-item" style="grid-column:1/-1;justify-content:center;color:var(--muted);font-size:.85rem;padding:18px;">📝 أكمل بياناتك من <a href="profile.html" style="color:var(--accent);font-weight:700;margin:0 4px;">البروفايل</a> لتظهر التحليلات.</div>';
+      return;
+    }
+
+    wrap.innerHTML = insights.slice(0, 3).map(i => `
+      <div class="dash-insight-item">
+        <div class="dash-insight-icon" style="background:${i.color}1a;color:${i.color};">${i.icon}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:700;font-size:.85rem;color:var(--fg);margin-bottom:2px;">${i.text}</div>
+          <div style="font-size:.74rem;color:var(--muted);line-height:1.4;">${i.sub || ''}</div>
+        </div>
+      </div>`).join('');
+  }
+
+  // ── Study activity heatmap ──
+  renderHeatmap() {
+    if (window.UQUX && window.UQUX.HeatMap && document.getElementById('study-heatmap')) {
+      try { window.UQUX.HeatMap.render('study-heatmap'); } catch (_) {}
     }
   }
 }
@@ -2974,173 +1533,60 @@ if (els.taskDay && els.taskDeadlineDate) {
       return formatISODate(d);
     }
 
-    function fallbackGeneratePlan() {
+    async function fallbackGeneratePlan() {
       if (!state.slots.length) return alert('أضف أوقات متاحة أولاً!');
-      if (!state.courses.length)
-        return alert('أضف مادة واحدة على الأقل أو استخدم صفحة البروفايل!');
-      if (!state.sessionMin || state.sessionMin < 20)
-        return alert('مدة الجلسة قصيرة جداً.');
+      if (!state.courses.length) return alert('أضف مادة واحدة على الأقل أو استخدم صفحة البروفايل!');
+      if (!state.sessionMin || state.sessionMin < 20) return alert('مدة الجلسة قصيرة جداً.');
 
-      const weeklySessionsTemplate = buildWeeklySessions();
-      if (!weeklySessionsTemplate.length) {
-        return alert('الفترات المتاحة قصيرة جداً بالنسبة لمدة الجلسة.');
-      }
-
-      const startDate = getPlanStartDateObj();
-      state.planStart = formatISODate(startDate);
-
-      const courses = state.courses;
-      const demand = {};
-      const deadlineWeek = {};
-      const warnings = [];
-      const maxWeeks = state.weeks || 1;
-      const weeklyCap = weeklySessionsTemplate.length;
-      const dayMs = 1000 * 60 * 60 * 24;
-
-      courses.forEach((c) => {
-        const current = Math.min(
-          100,
-          Math.max(0, parseFloat(c.currentProgress) || 0)
-        );
-        const perSession = Math.max(
-          0,
-          parseFloat(c.progressPerSession) || 0
-        );
-        let remaining = Math.max(0, 100 - current);
-        let requiredSessions;
-
-        if (perSession > 0) {
-          requiredSessions = Math.ceil(remaining / perSession);
-        } else {
-          const wh = Math.max(1, parseInt(c.weeklyHours) || 1);
-          requiredSessions = wh * maxWeeks;
-        }
-
-        demand[c.id] = requiredSessions;
-
-        if (c.examDate) {
-          const base = getPlanStartDateObj();
-          const exam = new Date(c.examDate + 'T00:00:00');
-          let diff = Math.floor((exam - base) / dayMs);
-          let wIdx = diff < 0 ? 1 : Math.floor(diff / 7) + 1;
-          if (wIdx > maxWeeks) wIdx = maxWeeks;
-          if (wIdx < 1) wIdx = 1;
-          deadlineWeek[c.id] = wIdx;
-        } else {
-          deadlineWeek[c.id] = maxWeeks;
-        }
-
-        const weeksWindow = deadlineWeek[c.id];
-        const capacity = weeklyCap * weeksWindow;
-        if (requiredSessions > capacity) {
-          warnings.push(
-            `المادة "${c.name}" تحتاج تقريبًا ${requiredSessions} جلسة حتى تصل 100٪، لكن السعة المتاحة حتى الاختبار هي ${capacity} جلسة فقط.`
-          );
-        }
-      });
-
-      const studyTasks = [];
-
-      for (let w = 1; w <= maxWeeks; w++) {
-        const weeklyQuota = {};
-        const weeklyAssigned = {};
-        Object.keys(demand).forEach((cid) => {
-          const left = demand[cid];
-          if (left <= 0 || w > deadlineWeek[cid]) {
-            weeklyQuota[cid] = 0;
-            weeklyAssigned[cid] = 0;
-            return;
+      try {
+        let token = null;
+        try {
+          if (window.firebase?.auth) {
+            const u = window.firebase.auth().currentUser;
+            if (u) token = await u.getIdToken();
           }
-          const weeksRemaining = deadlineWeek[cid] - w + 1;
-          weeklyQuota[cid] = Math.min(left, Math.ceil(left / weeksRemaining));
-          weeklyAssigned[cid] = 0;
+          if (!token && window.FirebaseAuth?.getIdToken) token = await window.FirebaseAuth.getIdToken();
+          if (!token && window.FirebaseDB?.getIdToken) token = await window.FirebaseDB.getIdToken();
+        } catch (_) { /* proceed without token */ }
+        const res = await fetch(`${window.AGENT_BASE_URL || 'http://localhost:8000'}/api/plan/generate-fallback`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+          },
+          body: JSON.stringify({
+            slots: state.slots,
+            courses: state.courses,
+            sessionMin: state.sessionMin,
+            weeks: state.weeks || 1,
+            planStart: formatISODate(getPlanStartDateObj())
+          })
         });
-
-        weeklySessionsTemplate.forEach((sess) => {
-          let chosenId = null;
-          let bestScore = -Infinity;
-
-          Object.keys(demand).forEach((cid) => {
-            const left = demand[cid];
-            if (left <= 0 || w > deadlineWeek[cid]) return;
-            const quotaLeft = weeklyQuota[cid] - weeklyAssigned[cid];
-            if (quotaLeft > 0) {
-              const score = quotaLeft * 1000 + left;
-              if (score > bestScore) {
-                bestScore = score;
-                chosenId = cid;
-              }
-            }
-          });
-
-          if (!chosenId) {
-            Object.keys(demand).forEach((cid) => {
-              const left = demand[cid];
-              if (left <= 0 || w > deadlineWeek[cid]) return;
-              if (left > bestScore) {
-                bestScore = left;
-                chosenId = cid;
-              }
-            });
+        
+        if (!res.ok) throw new Error('فشل التوليد من الخادم');
+        const data = await res.json();
+        
+        if (data.success && data.plan) {
+          const manualTasks = state.tasks || [];
+          state.plan = data.plan.concat(manualTasks);
+          
+          const weeksWithTasks = Array.from(new Set(state.plan.map((t) => t.week))).sort((a, b) => a - b);
+          state.currentWeekView = weeksWithTasks[0] || 1;
+          
+          storage.set('uqu_plan_v5', state);
+          renderWeekNav();
+          renderPlan();
+          renderWeekOverview();
+          
+          if (data.warnings && data.warnings.length) {
+            alert('تنبيه في توزيع الخطة:\n' + data.warnings.join('\n'));
           }
-
-          if (!chosenId) return;
-
-          const course = courses.find((c) => c.id === chosenId);
-          if (!course) return;
-
-          demand[chosenId]--;
-          if (weeklyQuota[chosenId] > 0) weeklyAssigned[chosenId]++;
-
-          const dateISO = getDateForWeekAndDay(w - 1, sess.day);
-
-          // Smart study tips based on profile memorization style
-          const memStyle = (profile?.learning?.memorization) || 'normal';
-          const studyTipMap = {
-            'repetition': 'كرر المحتوى عدة مرات حتى يثبت',
-            'visual':     'استخدم الخرائط الذهنية والرسوم التوضيحية',
-            'audio':      'سجل ملاحصاتك صوتياً واستمع إليها',
-            'normal':     'اقرأ وفهم ثم لخص بأسلوبك'
-          };
-          const studyTip = studyTipMap[memStyle] || studyTipMap['normal'];
-
-          studyTasks.push({
-            id: uuid(),
-            kind: 'study',
-            week: w,
-            day: sess.day,
-            date: dateISO,
-            time: minutesToTime(sess.startMins),
-            timeEnd: minutesToTime(sess.endMins),
-            courseId: course.id,
-            courseName: course.name,
-            courseColor: course.color,
-            title: `${course.name}: جلسة تقدّم دراسي`,
-            place: sess.place,
-            note: `💡 ${studyTip} — تقدم متوقع: ${
-              course.progressPerSession || '?'
-            }%`,
-            studyMethod: memStyle
-          });
-        });
-      }
-
-      const manualTasks = state.tasks || [];
-      state.plan = studyTasks.concat(manualTasks);
-
-      const weeksWithTasks = Array.from(new Set(state.plan.map((t) => t.week))).sort(
-        (a, b) => a - b
-      );
-      state.currentWeekView = weeksWithTasks[0] || 1;
-
-      storage.set('uqu_plan_v5', state);
-      renderWeekNav();
-      renderPlan();
-      renderWeekOverview();
-      if (warnings.length) {
-        alert(
-          'تنبيه في توزيع الخطة:\n' + warnings.join('\n')
-        );
+          if (window.__ui) window.__ui.showToast('تم توليد الخطة من الخادم السحابي بنجاح! 🚀', 'success');
+        } else {
+          alert(data.message || 'حدث خطأ غير معروف أثناء التوليد.');
+        }
+      } catch (err) {
+        alert('حدث خطأ أثناء توليد الخطة: ' + err.message);
       }
     }
 
@@ -3231,7 +1677,7 @@ if (els.taskDay && els.taskDeadlineDate) {
           aiRecs.style.display = 'none';
         }
       }
-      if (!state.plan.length) {
+      if (!(state.plan && state.plan.length)) {
         els.planGrid.innerHTML = `
           <div class="plan-empty">
             <div class="plan-empty-icon">📅</div>
@@ -3616,7 +2062,7 @@ if (els.taskDay && els.taskDeadlineDate) {
     // قائمة مصغّرة للمهام اليدوية في الشريط الجانبي
     function renderTasksMiniList() {
       if (!els.tasksMiniList) return;
-      const list = state.tasks || [];
+      const list = (state.tasks || []).filter(Boolean);
       if (!list.length) {
         els.tasksMiniList.innerHTML =
           '<span style="font-size:0.8rem; color:var(--muted);">لا توجد مهام أو اختبارات مضافة بعد.</span>';
@@ -3624,7 +2070,7 @@ if (els.taskDay && els.taskDeadlineDate) {
       }
       els.tasksMiniList.innerHTML = '';
       list
-        .sort((a, b) => a.week - b.week || dayIndex[a.day] - dayIndex[b.day] || a.time.localeCompare(b.time))
+        .sort((a, b) => (a.week || 0) - (b.week || 0) || (dayIndex[a.day] || 0) - (dayIndex[b.day] || 0) || (a.time || '').localeCompare(b.time || ''))
         .forEach((t, idx) => {
           const div = document.createElement('div');
           div.className = 'tasks-mini-item';
@@ -4086,7 +2532,7 @@ if (els.addTaskBtn) {
     }
     // Patch _apply to keep zoom indicator in sync
     const origApply = engine._apply.bind(engine);
-    engine._apply = function () { origApply(); updateZoom(); };
+    engine._apply = function (...args) { origApply(...args); updateZoom(); };
     updateZoom();
 
     // ── Global control functions (referenced by onclick in HTML) ──
@@ -4452,7 +2898,7 @@ if (els.addTaskBtn) {
 
       const accessible = navAccessible ? navAccessible.checked : false;
 
-      // Route from node (free-point / entrance) or from room
+      // Route from node (free-point / entrance) or from room — now sync, no await
       let result;
       if (navOrigin._fromNode) {
         result = navEngineInstance.findPathFromNode(navOrigin._fromNode, navDestination.id, { accessible });
@@ -4550,10 +2996,7 @@ if (els.addTaskBtn) {
 
       if (navRendererInstance) {
         navRendererInstance.clearRoute();
-        // Clear room highlights
-        (window.MAP_DATA || []).forEach(r => {
-          if (r.type !== 'corridor') navRendererInstance.clearHighlight(engine, r.id);
-        });
+        navRendererInstance.clearAllHighlights(engine);
       }
 
       if (navBanner) navBanner.style.display = 'none';
@@ -5241,24 +3684,34 @@ function initProfileWizard() {
   // =================================================================
 
   class App {
-    static start() {
+    static async start() {
 
       // ── Connect local brain to ai.js fallback bridge ──
       // When Claude API is unavailable, ai.js calls this
       window.__localBrainFallback = (text) => {
         const ctrl = window.__chatController;
-        if (ctrl && typeof ctrl.analyzeAndReply === 'function') {
-          return ctrl.analyzeAndReply(text);
+        if (ctrl && typeof ctrl.handleSend === 'function') {
+          ctrl.handleSend(text);
+          return '';
         }
         return 'المساعد الذكي غير متاح حالياً، حاول لاحقاً.';
       };
 
-      // ── UI manager (theme, nav, scroll, toasts) ──
+      // ── UI manager (theme, nav, scroll, toasts) — pure UI, no data ──
       new UIManager();
+
+      // ── Wait for Firebase auth state to settle BEFORE booting
+      //    any data-bound module (dashboard, chat, pomodoro, …).
+      //    Prevents the "render-before-data" / 401 race.
+      try {
+        if (window.UQUAuth?.waitForAuthReady) {
+          await window.UQUAuth.waitForAuthReady(5000);
+        }
+      } catch (_) { /* proceed even if auth bridge missing */ }
 
       // ── Reactive store listeners ──
       if (window.UQUModel) {
-        // Re-render dashboard on profile change
+        // Re-render dashboard on profile change (proxy-based)
         window.UQUModel.onChange('profile', () => {
           if (document.body.dataset.page === 'dashboard') {
             requestAnimationFrame(() => {
@@ -5267,6 +3720,31 @@ function initProfileWizard() {
           }
         });
       }
+
+      // ── Firestore-driven re-render hooks ──
+      // firebase-db.js writes directly to localStorage and dispatches these
+      // window events. The proxy-based UQUModel does NOT detect external
+      // localStorage writes, so we hook the events directly to keep the
+      // dashboard / chat / pomodoro in sync with Firestore.
+      const _rerender = () => {
+        const page = document.body?.dataset?.page;
+        if (page === 'dashboard') {
+          requestAnimationFrame(() => {
+            try { new DashboardController(); } catch (e) { console.warn('[Dashboard] re-render failed:', e); }
+          });
+        }
+        if (window.UQUEffects?.renderExamBadges) {
+          try { window.UQUEffects.renderExamBadges('exam-countdowns'); } catch (_) {}
+        }
+        if (window.UQUPomodoro?.refreshStats) {
+          try { window.UQUPomodoro.refreshStats(); } catch (_) {}
+        }
+      };
+      window.addEventListener('uqu:firebaseReady', _rerender);
+      window.addEventListener('uqu:profileUpdated', _rerender);
+      window.addEventListener('uqu:examsUpdated', _rerender);
+      window.addEventListener('uqu:planUpdated', _rerender);
+      window.addEventListener('uqu:notificationsUpdated', _rerender);
 
       // ── Upgrade smart chips in chat if UQUAIChat loaded ──
       const upgradeChips = () => {
@@ -5307,6 +3785,11 @@ function initProfileWizard() {
           break;
       }
 
+      // ── Boot Pomodoro stats now that auth is ready ──
+      if (window.UQUPomodoro?.refreshStats) {
+        try { window.UQUPomodoro.refreshStats(); } catch {}
+      }
+
       // ── Render exam countdowns in any page sidebar ──
       if (window.UQUEffects?.renderExamBadges) {
         window.UQUEffects.renderExamBadges('exam-countdowns');
@@ -5330,5 +3813,5 @@ function initProfileWizard() {
     }
   }
 
-  document.addEventListener('DOMContentLoaded', App.start);
+  document.addEventListener('DOMContentLoaded', () => { App.start(); });
 })();

@@ -9,12 +9,13 @@ feel like it truly "knows" the student.
 from datetime import datetime
 
 
-# ── Grade-point mapping (Saudi 5.0 scale) ──
+# ── Grade-point mapping (Saudi 5.0 scale — synced with frontend core.js) ──
 GP_MAP = {
-    "A+": 5.0, "A": 4.75, "A-": 4.5,
-    "B+": 4.0, "B": 3.75, "B-": 3.5,
-    "C+": 3.25, "C": 3.0, "C-": 2.75,
-    "D+": 2.5, "D": 2.25, "F": 0.0,
+    "A+": 5.00, "A": 4.75, "A-": 4.50,
+    "B+": 4.25, "B": 4.00, "B-": 3.75,
+    "C+": 3.50, "C": 3.00, "C-": 2.50,
+    "D+": 2.25, "D": 2.00, "D-": 1.75,
+    "F":  0.00,
 }
 
 

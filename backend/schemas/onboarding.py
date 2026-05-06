@@ -1,5 +1,41 @@
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
+
+
+# --- Save Profile Schema (replaces direct Firestore writes from onboarding.js) ---
+
+class OnboardingSaveGoals(BaseModel):
+    currentGpa: Optional[float] = None
+    earnedHours: Optional[int] = None
+    targetGpa: Optional[float] = None
+    planHours: Optional[float] = None
+    goal: str = "raise"
+
+class OnboardingSavePreferences(BaseModel):
+    theme: str = "auto"
+    notifications: bool = True
+    work_status: str = "none"
+    best_time: str = "night"
+    study_hours: Optional[int] = 10
+    method: str = "Pomodoro"
+    focus_length: Optional[int] = 45
+    study_speed: str = "normal"
+    stress_level: str = "normal"
+
+class SaveProfileRequest(BaseModel):
+    """Payload for POST /api/onboarding/save-profile.
+    Replaces the direct Firestore batch write in onboarding.js."""
+    goals: OnboardingSaveGoals
+    courses: List[Dict[str, Any]] = []
+    preferences: OnboardingSavePreferences = OnboardingSavePreferences()
+    timetable: List[Dict[str, Any]] = []
+    historical_semesters: List[Dict[str, Any]] = []
+    university: str = "أم القرى"
+
+class SaveProfileResponse(BaseModel):
+    success: bool = True
+    message: str = "تم حفظ البيانات بنجاح"
+
 
 # --- Transcript Parsing Schemas ---
 

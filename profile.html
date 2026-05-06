@@ -515,7 +515,7 @@
                 <p style="color: var(--muted); font-size: 0.8rem; margin-bottom: 12px;">تأكد من إدخال **ساعات الخطة** بشكل صحيح، فهذا يؤثر على جميع حسابات المعدل الأقصى.</p>
                 <div class="input-group" style="max-width: 250px; margin-bottom:0;">
                   <label class="lbl" style="color: var(--fg);" for="pPlanHours">إجمالي ساعات الخطة</label>
-                  <input type="number" id="pPlanHours" value="160" style="background:var(--surface-2);" />
+                  <input type="number" id="pPlanHours" placeholder="مثال: 187" style="background:var(--surface-2);" />
                 </div>
               </div>
             </div>
@@ -647,9 +647,10 @@
 
   <script src="assets/core.js" defer></script>
   <script src="assets/data-bridge.js" defer></script>
-  <script src="assets/auth.js"></script>
+  <script src="assets/auth.js" defer></script>
   <script src="assets/firebase-auth.js" defer></script>
   <script src="assets/firebase-db.js" defer></script>
+  <script src="assets/notifications.js" defer></script>
   <script src="assets/student-model.js" defer></script>
   <script src="assets/engine.js" defer></script>
   <script src="assets/actions.js" defer></script>
@@ -663,7 +664,6 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="assets/transcript-parser.js" defer></script>
   <script src="assets/ai-service.js" defer></script>
-  <script src="assets/schedule-parser.js" defer></script>
   <script src="assets/app.js" defer></script>
   <script src="assets/notifications.js" defer></script>
 
@@ -683,6 +683,19 @@
     catch { return null; }
   }
 
+  /* ── Derive academic level from completed semesters (uqu_semesters)
+        when the profile has no explicit level. 11 completed semesters
+        → user is currently in level 12, etc. ────────────────────── */
+  function _deriveLevelFromSemesters() {
+    try {
+      const sems = JSON.parse(localStorage.getItem('uqu_semesters') || '[]') || [];
+      const completed = sems.filter(s =>
+        s.status === 'completed' || (s.courses || []).some(c => c.grade)
+      ).length;
+      return completed > 0 ? String(completed + 1) : '';
+    } catch (_) { return ''; }
+  }
+
   /* ── Normalize: always return a unified flat object ────────── */
   function getProfile() {
     const raw = getRawProfile();
@@ -697,7 +710,7 @@
         name:          b.name,
         university:    b.university,
         major:         b.major,
-        level:         b.level,
+        level:         b.level || _deriveLevelFromSemesters(),
         studyType:     b.studyType,
         workStatus:    b.workStatus,
         semStartDate:  b.semStart,
@@ -777,8 +790,17 @@
   }
 
   /* ── Helpers ─────────────────────────────────────────────────── */
-  const LEVEL_MAP = {'1':'الأول','2':'الثاني','3':'الثالث','4':'الرابع','5':'الخامس','6':'السادس','7':'السابع','8':'الثامن'};
-  function levelLabel(n) { return LEVEL_MAP[String(n)] ? 'المستوى ' + LEVEL_MAP[String(n)] : '—'; }
+  const LEVEL_MAP = {
+    '1':'الأول','2':'الثاني','3':'الثالث','4':'الرابع','5':'الخامس','6':'السادس',
+    '7':'السابع','8':'الثامن','9':'التاسع','10':'العاشر','11':'الحادي عشر','12':'الثاني عشر',
+    '13':'الثالث عشر','14':'الرابع عشر'
+  };
+  function levelLabel(n) {
+    if (!n) return '—';
+    const key = String(n);
+    if (LEVEL_MAP[key]) return 'المستوى ' + LEVEL_MAP[key];
+    return 'المستوى ' + key;
+  }
   function goalLabel(g) { return {'raise':'رفع المعدل','keep':'المحافظة على المعدل','pass':'اجتياز بنجاح'}[g] || '—'; }
   const TIME_MAP = {morning:'الصباح',noon:'الظهر',evening:'المساء',night:'الليل',any:'أي وقت'};
   function timeAgo(iso) {
@@ -1072,7 +1094,7 @@
     }
   });
   window.addEventListener('uqu:auth', function(e) {
-    if (['profile_updated', 'achievement'].indexOf(e.detail?.type) !== -1) initProfilePage();
+    if (e.detail?.type === 'profile_updated') initProfilePage();
   });
 
   // Init data management and achievements panels

@@ -1,14 +1,21 @@
 import json
 import logging
 import io
+from datetime import datetime, timezone
 import pdfplumber
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from openai import AsyncOpenAI
 from pydantic import ValidationError
 
 from config import get_settings
-from auth.dependencies import get_current_user_optional
-from schemas.onboarding import OnboardingTranscriptResponse, TimetableResponse
+from auth.dependencies import get_current_user_optional, get_current_user
+from schemas.onboarding import (
+    OnboardingTranscriptResponse,
+    TimetableResponse,
+    SaveProfileRequest,
+    SaveProfileResponse,
+)
+from db.firestore import get_db
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/onboarding", tags=["Onboarding"])
@@ -147,3 +154,64 @@ async def analyze_timetable(
     except Exception as e:
         logger.error(f"Timetable Parse Error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="تعذر استخراج أوقات المحاضرات من الجدول.")
+
+
+# ──────────────────────────────────────────────────────────────
+# 3. SAVE PROFILE (replaces direct Firestore batch write in JS)
+# ──────────────────────────────────────────────────────────────
+
+@router.post("/save-profile", response_model=SaveProfileResponse)
+async def save_onboarding_profile(
+    payload: SaveProfileRequest,
+    user_id: str = Depends(get_current_user),
+):
+    """
+    Server-side replacement for the direct Firestore batch write
+    that was previously in onboarding.js (lines 276-303).
+
+    Performs the EXACT same Firestore writes:
+    1. users/{uid}.set({ profile, study_preferences, timetable, updatedAt }, merge=true)
+    2. users/{uid}/semesters/term_{i}.set(semester_data) for each historical semester
+    """
+    try:
+        db = get_db()
+        user_ref = db.collection("users").document(user_id)
+        now_iso = datetime.now(timezone.utc).isoformat()
+
+        # ── Build the profile document (exact same shape as JS) ──
+        profile_doc = {
+            "profile": {
+                "currentGpa":  payload.goals.currentGpa,
+                "earnedHours": payload.goals.earnedHours,
+                "targetGpa":   payload.goals.targetGpa,
+                "planHours":   payload.goals.planHours,
+                "courses":     payload.courses,
+                "university":  payload.university,
+            },
+            "study_preferences": payload.preferences.model_dump(),
+            "timetable": payload.timetable,
+            "updatedAt": now_iso,
+        }
+
+        # ── Batch write (mirrors the JS batch.commit()) ──
+        batch = db.batch()
+        batch.set(user_ref, profile_doc, merge=True)
+
+        # Write historical semesters as sub-documents
+        if payload.historical_semesters:
+            for i, sem in enumerate(payload.historical_semesters):
+                sem_ref = user_ref.collection("semesters").document(f"term_{i}")
+                batch.set(sem_ref, sem)
+
+        batch.commit()
+
+        logger.info(f"[Onboarding] Profile saved for user {user_id}")
+        return SaveProfileResponse(success=True, message="تم حفظ البيانات بنجاح")
+
+    except Exception as e:
+        logger.error(f"[Onboarding] Save profile failed: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail="فشل حفظ البيانات. يرجى المحاولة مرة أخرى."
+        )
+

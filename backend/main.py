@@ -36,6 +36,7 @@ from db.firestore import init_firestore
 from routers.chat import router as chat_router
 from routers.profile import router as profile_router
 from routers.transcript import router as transcript_router
+from routers.transcript_parser import router as transcript_parser_router
 from routers.student import router as student_router
 from routers.notifications import router as notifications_router
 from routers.onboarding import router as onboarding_router
@@ -45,6 +46,10 @@ from routers.engine import router as engine_router
 from routers.pomodoro import router as pomodoro_router
 from routers.firebase_writes import router as firebase_writes_router
 from routers.achievements import router as achievements_router
+from routers.news import router as news_router
+from routers.tools import router as tools_router
+from routers.diagnostics import router as diagnostics_router
+from routers.nav import router as nav_router
 
 # ── Import CRON tasks ──
 from tasks.cron import daily_notifications_cron
@@ -87,8 +92,12 @@ async def lifespan(app: FastAPI):
     yield
 
     # ── Shutdown ──
-    scheduler.shutdown()
-    logger.info("👋 Backend shutting down.")
+    try:
+        if scheduler.running:
+            scheduler.shutdown()
+            logger.info("👋 Backend shutting down.")
+    except Exception:
+        pass
 
 
 # ══════════════════════════════════════════════════════════════
@@ -102,19 +111,26 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# ── CORS (allow all origins for development) ──
+# ── CORS ──
+# allow_credentials must be False when allow_origins=["*"] — browsers reject
+# credentialed responses with wildcard origin (CORS spec §3.2.5).
+# Bearer token auth uses Authorization header, not cookies, so credentials=False is correct.
+#
+# IMPORTANT: The Fetch spec explicitly excludes "Authorization" from the "*" wildcard in
+# Access-Control-Allow-Headers — it must be listed explicitly regardless of credentials mode.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],          # In production, restrict to your domain
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=["Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With"],
 )
 
 # ── Register Routers ──
 app.include_router(chat_router)
 app.include_router(profile_router)
 app.include_router(transcript_router)
+app.include_router(transcript_parser_router)
 app.include_router(student_router)
 app.include_router(notifications_router)
 app.include_router(onboarding_router)
@@ -124,6 +140,10 @@ app.include_router(engine_router)
 app.include_router(pomodoro_router)
 app.include_router(firebase_writes_router)
 app.include_router(achievements_router)
+app.include_router(news_router)
+app.include_router(tools_router)
+app.include_router(diagnostics_router)
+app.include_router(nav_router)
 
 
 # ── Health Check ──

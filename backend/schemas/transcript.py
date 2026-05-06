@@ -10,27 +10,55 @@ from pydantic import BaseModel
 
 class CourseRecord(BaseModel):
     """A single course from the academic transcript."""
-    name: str
     code: str = ""
-    grade: str = ""
-    credit_hours: int = 3
-    creditHours: int | None = None  # frontend camelCase alias
-
-    model_config = {"populate_by_name": True}
-
-    def get_hours(self) -> int:
-        return self.creditHours or self.credit_hours
-
+    nameEn: str = ""
+    nameAr: str = ""
+    name: str = ""
+    creditHours: int = 0
+    passHours: int = 0
+    degree: int = 0
+    grade: str | None = None
+    points: float = 0.0
+    gradePoints: float | None = None
+    semester: str = ""
+    semesterEn: str = ""
+    semesterStatus: str = ""  # completed, registered, current
+    difficulty: str = "medium"
+    type: str = "theory"
 
 class SemesterRecord(BaseModel):
     """A semester from the academic transcript with GPA."""
-    name: str = ""          # "الفصل الأول 1446"
-    gpa: float = 0.0
-    hours: int = 0
-    courses: list[CourseRecord] = []
+    nameEn: str = ""
+    nameAr: str = ""
+    term: str = ""
+    year: str = ""
+    sgpa: float | None = None
+    cgpa: float | None = None
+    totalHours: int = 0
+    totalPassedHours: int = 0
+    courses: list[dict] = []
+    status: str = "completed"
 
-    model_config = {"populate_by_name": True}
-
+class TranscriptAnalysisResult(BaseModel):
+    """Full structured output of the PDF parsing process."""
+    name: str | None = None
+    nameEn: str | None = None
+    studentId: str | None = None
+    university: str | None = None
+    major: str | None = None
+    majorEn: str | None = None
+    faculty: str | None = None
+    degree: str | None = None
+    studyType: str | None = None
+    gpa: float | None = None
+    earnedHours: int | None = None
+    planHours: int | None = None
+    totalPoints: float | None = None
+    semesters: list[SemesterRecord] = []
+    completedCourses: list[CourseRecord] = []
+    registeredCourses: list[CourseRecord] = []
+    confidence: int = 0
+    timestamp: str = ""
 
 class TranscriptPayload(BaseModel):
     """Request body for POST /api/sync-transcript."""
@@ -38,7 +66,6 @@ class TranscriptPayload(BaseModel):
     semesters: list[SemesterRecord] = []
     cgpa: float | None = None
     totalHours: int | None = None
-
 
 class TranscriptResponse(BaseModel):
     """Response body for POST /api/sync-transcript."""

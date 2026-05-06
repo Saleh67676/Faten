@@ -304,8 +304,71 @@
       this.logout();
     },
 
+    /* ── Get Firebase ID Token (for FastAPI auth) ─────── */
+    async getToken() {
+      // Prefer the live Firebase Auth user — most reliable source.
+      try {
+        if (typeof firebase !== 'undefined' && firebase.auth) {
+          const user = firebase.auth().currentUser;
+          if (user) return await user.getIdToken();
+        }
+      } catch (_) { /* fall through */ }
+
+      // Fallback to FirebaseAuth bridge if firebase isn't ready yet.
+      if (window.FirebaseAuth?.getIdToken) {
+        try { return await window.FirebaseAuth.getIdToken(); } catch (_) { }
+      }
+      return null;
+    },
+
+    /* ── Wait for Firebase auth state to settle ─────── */
+    waitForAuthReady(timeoutMs = 5000) {
+      return new Promise((resolve) => {
+        if (typeof firebase === 'undefined' || !firebase.auth) {
+          resolve(null);
+          return;
+        }
+        const fbAuth = firebase.auth();
+        if (fbAuth.currentUser) {
+          resolve(fbAuth.currentUser);
+          return;
+        }
+        let done = false;
+        const unsub = fbAuth.onAuthStateChanged((user) => {
+          if (done) return;
+          done = true;
+          try { unsub(); } catch (_) { }
+          resolve(user || null);
+        });
+        setTimeout(() => {
+          if (done) return;
+          done = true;
+          try { unsub(); } catch (_) { }
+          resolve(fbAuth.currentUser || null);
+        }, timeoutMs);
+      });
+    },
+
+    /* ── Achievement trigger (delegates to backend) ───── */
+    addAchievement(badgeId) {
+      if (!badgeId) return;
+      try {
+        const earned = JSON.parse(localStorage.getItem('uqu_earned_badges') || '[]');
+        if (!earned.includes(badgeId)) {
+          earned.push(badgeId);
+          localStorage.setItem('uqu_earned_badges', JSON.stringify(earned));
+        }
+      } catch (_) {}
+      if (window.UQUAchievements?.checkBadges) {
+        try { window.UQUAchievements.checkBadges(badgeId); } catch (_) { }
+      }
+      this._dispatchChange('achievement', { id: badgeId });
+    },
+
     /* ── Get All Achievements ─────────────── */
     getAchievements() {
+      let earned = [];
+      try { earned = JSON.parse(localStorage.getItem('uqu_earned_badges') || '[]'); } catch (_) {}
       const all = [
         { id: 'first_login',   icon: '🎉', name: 'أول تسجيل دخول',    desc: 'مرحباً بك في المساعد الأكاديمي!' },
         { id: 'week_streak',   icon: '🔥', name: 'أسبوع متواصل',      desc: 'سجّلت الدخول 7 أيام متتالية' },
@@ -318,8 +381,7 @@
         { id: 'night_owl',     icon: '🦉', name: 'بومة الليل',        desc: 'ذاكرت بعد منتصف الليل' },
         { id: 'early_bird',    icon: '🌅', name: 'الصاعد الباكر',     desc: 'ذاكرت قبل الساعة 6 صباحاً' },
       ];
-      // Fetch earned from profile cache if needed (for simplicity returning false until populated natively)
-      return all.map(a => ({ ...a, earned: false }));
+      return all.map(a => ({ ...a, earned: earned.includes(a.id) }));
     },
 
     /* ── Event Dispatcher ─────────────────── */

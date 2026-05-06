@@ -110,7 +110,7 @@
               <span style="font-size:.74rem;color:var(--muted);">متصل</span>
             </div>
             <span style="font-size:.68rem;color:var(--muted);background:rgba(99,102,241,.1);
-              border-radius:8px;padding:2px 7px;">Gemini Flash</span>
+              border-radius:8px;padding:2px 7px;">kimi AI</span>
           </div>
           <p class="muted" style="font-size:.7rem;line-height:1.5;">بياناتك محفوظة محلياً ومحمية.</p>
         </div>
@@ -440,26 +440,33 @@
       }
 
       function appendMessage(text, type) {
-        if (typeof text === 'object') {
-          // Flatten if it's an object or PointerEvent
-          text = text?.content || (text instanceof Event ? '' : JSON.stringify(text));
+        if (typeof text === 'object' && text !== null) {
+          // If it's a message object, get its content. If it's an array, it's corrupted, so try to handle it.
+          if (Array.isArray(text)) {
+            text = text[0]?.content || JSON.stringify(text);
+          } else {
+            text = text.content || JSON.stringify(text);
+          }
         }
         text = String(text || '');
 
         const row = document.createElement('div');
-        row.className = 'msg-row ' + (type === 'user' ? 'user-row' : '');
+        // Use 'me' class for user messages to trigger flex-direction: row-reverse in CSS
+        row.className = 'msg-row ' + (type === 'user' ? 'me' : 'bot');
 
         if (type === 'bot') {
           row.innerHTML = `
-            <div class="avatar bot-avatar" style="width:36px; height:36px; background:linear-gradient(135deg,var(--accent),var(--accent-2)); border-radius:12px; display:grid; place-items:center; color:#fff; font-size:1rem; flex-shrink:0;">&#129302;</div>
-            <div class="msg-content bot-msg">${window.renderMarkdown ? renderMarkdown(text) : text}</div>
+            <div class="avatar bot-avatar">&#129302;</div>
+            <div class="bubble">${window.renderMarkdown ? renderMarkdown(text) : text}</div>
           `;
         } else {
           row.innerHTML = `
-            <div class="msg-content user-msg">${text.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+            <div class="bubble">${text.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+            <div class="avatar user-avatar">👤</div>
           `;
         }
         box.appendChild(row);
+        box.scrollTop = box.scrollHeight;
       }
 
       // New chat button

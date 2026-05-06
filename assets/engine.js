@@ -1,18 +1,13 @@
 /**
  * ================================================================
- * UQU ENGINE v2.0 — Smart Academic Intelligence (Hybrid Wrapper)
+ * UQU ENGINE v2.0 — Smart Academic Intelligence (Thin Client)
  * ================================================================
- * Public compute helpers (scoreExamPressure, getPlanWarnings,
- * suggestExtraSessionsForCourse) are now async thin wrappers around
- * the FastAPI backend (POST /api/engine/*). The algorithms are
- * authoritative on the backend.
+ * All compute-heavy algorithms (exam pressure, plan warnings,
+ * session suggestions, and smart plan generation) are now async
+ * wrappers around the FastAPI backend (POST /api/engine/*).
  *
- * Internal sync copies of the compute helpers are retained ONLY
- * because the client-side generateSmartPlan still uses them. They
- * are not exposed publicly.
- *
- * DateUtils, generateICS/downloadICS, generateSmartPlan,
- * predictRequiredGrade, normalizeArabic remain client-side.
+ * The client strictly handles Date/ICS utilities, GPA math,
+ * and text normalization.
  * ================================================================
  */
 
@@ -43,52 +38,11 @@
   const DateUtils = new Proxy({}, { get(_, k) { return getD()[k]; } });
 
   // ──────────────────────────────────────────────
-  // BACKEND HELPERS
+  // BACKEND HELPER — uses centralized UQUCore.api client
   // ──────────────────────────────────────────────
 
-  function _getBackendBase() {
-    return (
-      window.UQU_BACKEND_URL ||
-      window.BACKEND_URL ||
-      (window.location && window.location.origin && window.location.origin.startsWith('http')
-        ? window.location.origin
-        : 'http://localhost:8000')
-    );
-  }
-
-  async function _getIdToken() {
-    try {
-      if (window.firebase && window.firebase.auth) {
-        const user = window.firebase.auth().currentUser;
-        if (user && typeof user.getIdToken === 'function') {
-          return await user.getIdToken();
-        }
-      }
-    } catch (_) { /* ignored */ }
-    if (window.FirebaseAuth && typeof window.FirebaseAuth.getIdToken === 'function') {
-      try { return await window.FirebaseAuth.getIdToken(); } catch (_) { /* ignored */ }
-    }
-    return null;
-  }
-
-  async function _engineCall(path, body) {
-    const token = await _getIdToken();
-    const headers = { 'Content-Type': 'application/json' };
-    if (token) headers['Authorization'] = 'Bearer ' + token;
-    const response = await fetch(_getBackendBase() + path, {
-      method: 'POST',
-      headers: headers,
-      body: JSON.stringify(body || {})
-    });
-    if (!response.ok) {
-      let errMsg = `HTTP ${response.status} failed`;
-      try {
-        const errBody = await response.json();
-        if (errBody && errBody.detail) errMsg = errBody.detail;
-      } catch (_) { /* ignored */ }
-      throw new Error(errMsg);
-    }
-    return response.json();
+  function _engineCall(path, body) {
+    return window.UQUCore.api.post(path, body || {});
   }
 
   function _todayIso() {
@@ -106,26 +60,6 @@
       today: _todayIso()
     });
     return (data && Array.isArray(data.courses)) ? data.courses : [];
-  }
-
-  // Internal sync copy used by generateSmartPlan only — not exported.
-  function _scoreExamPressureSync(courses) {
-    if (!courses || !courses.length) return [];
-    return courses
-      .map(c => {
-        if (!c.examDate) return { ...c, pressure: 0 };
-        const days = DateUtils.daysUntil(c.examDate);
-        if (days === null || days < 0) return { ...c, pressure: 0 };
-        const difficultyFactor = c.difficulty === 'hard' ? 1.4
-                               : c.difficulty === 'easy' ? 0.7 : 1.0;
-        const progressFactor   = 1 - (parseFloat(c.currentProgress) || 0) / 100;
-        const daysFactor       = Math.exp(-days / 10);
-        const pressure = Math.round(
-          Math.min(100, daysFactor * 100 * difficultyFactor * (0.4 + 0.6 * progressFactor))
-        );
-        return { ...c, pressure, daysUntil: days };
-      })
-      .sort((a, b) => b.pressure - a.pressure);
   }
 
   // ──────────────────────────────────────────────
@@ -158,51 +92,6 @@
     return (data && Array.isArray(data.warnings)) ? data.warnings : [];
   }
 
-  // Internal sync copy used by generateSmartPlan only — not exported.
-  function _getPlanWarningsSync(plan) {
-    const warnings = [];
-    const sessions = plan?.plan || [];
-    if (!sessions.length) {
-      warnings.push({ type: 'empty', msg: 'الخطة فارغة — لا توجد جلسات مجدولة.' });
-      return warnings;
-    }
-    const byDate = {};
-    sessions.forEach(s => {
-      if (!s.date) return;
-      byDate[s.date] = (byDate[s.date] || 0) + 1;
-    });
-    Object.entries(byDate).forEach(([date, count]) => {
-      if (count > 6) {
-        warnings.push({ type: 'overload', msg: `يوم ${date} فيه ${count} جلسات — قد يكون مرهقاً.` });
-      }
-    });
-    const profile = window.UQUModel?.getProfile?.();
-    const examCourses = (profile?.courses || []).filter(c => c.examDate);
-    examCourses.forEach(c => {
-      const days = DateUtils.daysUntil(c.examDate);
-      if (days !== null && days <= 3 && days >= 0) {
-        const hasSession = sessions.some(s => s.courseId === c.id || s.courseName === c.name);
-        if (!hasSession) {
-          warnings.push({
-            type: 'exam_soon',
-            msg: `اختبار ${c.name} بعد ${days} يوم — لا يوجد جلسة مذاكرة له في الخطة!`,
-            urgent: true
-          });
-        }
-      }
-    });
-    const sortedDates = Object.keys(byDate).sort();
-    for (let i = 1; i < sortedDates.length; i++) {
-      const a = new Date(sortedDates[i-1]);
-      const b = new Date(sortedDates[i]);
-      const gap = Math.round((b - a) / 86400000);
-      if (gap > 3) {
-        warnings.push({ type: 'gap', msg: `فجوة ${gap} أيام بين ${sortedDates[i-1]} و ${sortedDates[i]} — ربما تحتاج جلسة وسط.` });
-      }
-    }
-    return warnings;
-  }
-
   // ──────────────────────────────────────────────
   // 5. SUGGEST EXTRA SESSIONS — public async wrapper
   // ──────────────────────────────────────────────
@@ -220,81 +109,26 @@
   }
 
   // ──────────────────────────────────────────────
-  // 6. SMART PLAN GENERATOR (stays client-side; uses private sync helpers)
+  // 6. SMART PLAN GENERATOR (Thin Wrapper)
   // ──────────────────────────────────────────────
 
-  function generateSmartPlan(profile, slots, options = {}) {
-    const courses  = profile?.courses || [];
-    const learning = profile?.learning || {};
-
-    if (!courses.length || !slots.length) return { plan: [], warnings: ['لا توجد مواد أو أوقات كافية.'] };
-
-    const sessionMin   = options.sessionMin || learning.focusMinutes || 45;
-    const semStart     = profile?.basic?.semStart || DateUtils.toISO(DateUtils.today());
-    const semWeeks     = parseInt(profile?.basic?.weeks) || 16;
-    const maxDaily     = parseInt(learning.maxDailySessions) || 3;
-
-    const pressured   = _scoreExamPressureSync(courses);
-    const sessions    = [];
-    const dayLoad     = {};
-
-    const COLORS = ['#6366f1','#06b6d4','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899'];
-    pressured.forEach((c, i) => { if (!c.color) c.color = COLORS[i % COLORS.length]; });
-
-    const allDays = [];
-    for (let w = 0; w < semWeeks; w++) {
-      for (let d = 0; d < 7; d++) {
-        const date = DateUtils.addDays(new Date(semStart + 'T00:00:00'), w * 7 + d);
-        const iso  = DateUtils.toISO(date);
-        const dow  = ['الأحد','الإثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'][date.getDay()];
-        const matchSlots = slots.filter(sl => sl.day === dow);
-        if (matchSlots.length) allDays.push({ iso, dow, w, slots: matchSlots });
-      }
+  async function generateSmartPlan(profile, slots, options = {}) {
+    try {
+      const data = await _engineCall('/api/engine/smart-plan', {
+        profile: profile,
+        slots: slots,
+        options: options,
+        today: _todayIso()
+      });
+      return data;
+    } catch (err) {
+      console.error('Smart Plan Engine Error:', err);
+      return { 
+        plan: [], 
+        warnings: [{ type: 'error', msg: 'فشل توليد الخطة من الخادم.' }],
+        stats: { total: 0, hours: 0, weeks: 0 }
+      };
     }
-
-    let courseIdx = 0;
-    for (const day of allDays) {
-      for (const slot of day.slots) {
-        const course = pressured[courseIdx % pressured.length];
-        courseIdx++;
-
-        const dayCount = dayLoad[day.iso] || 0;
-        if (dayCount >= maxDaily) continue;
-
-        if (course.daysUntil !== undefined && course.daysUntil < 0) continue;
-
-        const endTime  = DateUtils.parseTime(slot.from);
-        const duration = Math.max(30, Math.min(sessionMin, 120));
-        const endMin   = endTime + duration;
-
-        sessions.push({
-          id:         `s_${day.iso}_${slot.day}_${course.id || courseIdx}`,
-          date:       day.iso,
-          day:        day.dow,
-          time:       slot.from,
-          timeEnd:    DateUtils.formatTime(endMin),
-          week:       day.w + 1,
-          courseName: course.name,
-          courseId:   course.id || null,
-          courseColor:course.color,
-          place:      slot.place || 'غير محدد',
-          pressure:   course.pressure || 0,
-          kind:       'auto'
-        });
-
-        dayLoad[day.iso] = dayCount + 1;
-      }
-    }
-
-    return {
-      plan:      sessions,
-      warnings:  _getPlanWarningsSync({ plan: sessions }),
-      stats: {
-        total:    sessions.length,
-        hours:    Math.round(sessions.length * sessionMin / 60 * 10) / 10,
-        weeks:    semWeeks
-      }
-    };
   }
 
   // ──────────────────────────────────────────────
