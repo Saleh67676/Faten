@@ -333,7 +333,7 @@ function LocationsContent() {
             ) : selectedRoom ? (
               // 3. Room is selected (no route yet) — search/lists are
               //    hidden; only the focused selection card appears so
-              //    the big "ملاحة إلى هنا" button is unmistakable.
+              //    the big "ابدأ" button is unmistakable.
               <>
                 <SelectedRoomCard
                   room={selectedRoom}
@@ -653,7 +653,7 @@ function SelectedRoomCard({
           )}
         >
           <Navigation2 className="w-5 h-5" />
-          🧭 ملاحة إلى هنا
+          ابدأ
         </Button>
       </Card>
     </div>
@@ -725,7 +725,7 @@ function ActiveRoutePanel({
         className="w-full rounded-xl glass border-foreground/10 gap-2"
       >
         <X className="w-4 h-4" />
-        إنهاء الملاحة
+        إنهاء
       </Button>
     </Card>
   );
