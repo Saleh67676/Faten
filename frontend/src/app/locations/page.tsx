@@ -679,7 +679,7 @@ function ActiveRoutePanel({
         <div className="w-8 h-8 rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-300 animate-pulse">
           <Navigation2 className="w-4 h-4" />
         </div>
-        <h3 className="font-bold text-emerald-300">جاري الملاحة</h3>
+        <h3 className="font-bold text-emerald-300">المسار</h3>
       </div>
 
       <div className="space-y-2">
