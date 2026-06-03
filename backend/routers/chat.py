@@ -20,7 +20,16 @@ from agent.prompts import build_system_prompt
 from agent.loop import run_agent_loop
 from services.student import load_student_context
 from agent.intent import classify_intent
+import re
 
+def _normalize_text(text: str) -> str:
+    """دالة مساعدة لتنظيف النصوص وتوحيد التاء المربوطة والهمزات لضمان دقة البحث"""
+    if not text:
+        return ""
+    t = str(text).lower().strip()
+    t = re.sub(r"[أإآ]", "ا", t)
+    t = re.sub(r"ة", "ه", t)
+    return t
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Chat"])
 

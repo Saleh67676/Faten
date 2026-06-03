@@ -1487,17 +1487,40 @@ async def execute_tool(
         results = []
         message = ""
 
+        def _normalize_text(text: str) -> str:
+            """تنظيف النص للمقارنة: إزالة التشكيل، توحيد الأحرف، تصغير."""
+            if not text:
+                return ""
+            import unicodedata
+            text = str(text).lower().strip()
+            # إزالة التشكيل
+            text = ''.join(c for c in unicodedata.normalize('NFD', text)
+                          if unicodedata.category(c) != 'Mn')
+            # توحيد أشكال الألف
+            text = text.replace('أ', 'ا').replace('إ', 'ا').replace('آ', 'ا')
+            # توحيد التاء المربوطة والهاء
+            text = text.replace('ة', 'ه')
+            return text
+
         try:
             if query_type == "search":
                 if not query:
                     return {"success": False, "message": "يجب تحديد كلمة البحث"}
+                
+                clean_query = _normalize_text(query)
+                
                 for term in UQU_CALENDAR:
                     for event in term.get("events", []):
-                        # البحث في العنوان أو النوع أو التاريخ
-                        if (query in event.get("title", "").lower() or 
-                            query in event.get("type", "").lower() or 
-                            query in event.get("date", "").lower() or 
-                            query in event.get("hijri", "").lower()):
+                        clean_title = _normalize_text(event.get("title", ""))
+                        clean_type = _normalize_text(event.get("type", ""))
+                        clean_date = _normalize_text(event.get("date", ""))
+                        clean_hijri = _normalize_text(event.get("hijri", ""))
+                        
+                        if (clean_query in clean_title or 
+                            clean_query in clean_type or 
+                            clean_query in clean_date or 
+                            clean_title in clean_query or
+                            clean_query in clean_hijri):
                             results.append(event)
                 message = f"تم العثور على {len(results)} حدث"
 
@@ -1513,8 +1536,12 @@ async def execute_tool(
             elif query_type == "by_term":
                 if not query:
                     return {"success": False, "message": "يجب تحديد اسم الفصل الدراسي"}
+                
+                # تنظيف الكلمة واسم الفصل لضمان المطابقة
+                clean_query = _normalize_text(query)
                 for term in UQU_CALENDAR:
-                    if query in term.get("term", "").lower():
+                    clean_term_name = _normalize_text(term.get("term", ""))
+                    if clean_query in clean_term_name:
                         results.extend(term.get("events", []))
                 message = f"تم العثور على {len(results)} حدث في الفصل الدراسي"
 

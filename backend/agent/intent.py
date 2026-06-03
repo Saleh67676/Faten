@@ -11,6 +11,11 @@ INTENT_MAP = {
         "needs_tools": False,
         "direct_response": "أهلاً بك! معك فطن، مرشدك الأكاديمي. كيف يمكنني مساعدتك اليوم؟"
     },
+    "CALENDAR_QUERY": {
+        "required_blocks": [],
+        "needs_tools": True,
+        "direct_response": None
+    },
     "GENERAL_QA": {
         "required_blocks": [],
         "needs_tools": False,
@@ -57,7 +62,6 @@ def classify_intent_heuristic(messages: list) -> dict:
     if not messages:
         return {"intent": "UNKNOWN", "source": "heuristic"}
 
-    # Extract last user message
     last_user_msg = next((m for m in reversed(messages) if getattr(m, 'role', m.get('role', '') if isinstance(m, dict) else '') == 'user'), None)
     if not last_user_msg:
         return {"intent": "UNKNOWN", "source": "heuristic"}
@@ -79,7 +83,6 @@ def classify_intent_heuristic(messages: list) -> dict:
         "هاي", "هلو", "صباح الخير", "مساء الخير", 
         "كيفك", "كيف الحال", "وش اخبارك", "عامل ايه"
     }
-    
     if msg_cleaned in greeting_exact_matches:
         return {"intent": "GREETING", "source": "heuristic"}
 
@@ -138,6 +141,26 @@ def classify_intent_heuristic(messages: list) -> dict:
     if any(w in msg for w in ['سجل', 'مستوى', 'تقييم', 'نقاط ضعف']):
         return {"intent": "FULL_ACADEMIC_ANALYSIS", "source": "heuristic"}
 
+    # ── CALENDAR: يجب قبل COURSE_INFO لأن "اختبار" كلمة مشتركة ──
+    calendar_patterns = [
+        r'اختبارات نهائية', r'اختبار نهائي', r'موعد النهائي',
+        r'متى النهائي', r'متى الاختبارات', r'تقويم أكاديمي', r'إجازة',
+        r'نهاية الفصل', r'متى الفصل', r'بداية الفصل', r'تواريخ الاختبارات',
+        r'الفاينل', r'فاينل', r'موعد الفاينل', r'متى الفاينل',
+        r'اختبارات نصفية', r'اختبار نصفي', r'متى الميد', r'موعد الميد',
+        r'أحداث الفصل', r'كل أحداث', r'أقرب حدث', r'ينتهي الفصل', r'يبدأ الفصل'
+    ]
+    calendar_context_words = [
+        'فصل الثاني', 'فصل الأول', 'الفصل الثاني', 'الفصل الأول',
+        'تقويم', 'نهائية', 'نصفية', 'العام الدراسي', 'الجامعي'
+    ]
+    has_calendar_pattern = any(re.search(p, msg) for p in calendar_patterns)
+    has_calendar_context = any(w in msg for w in calendar_context_words)
+
+    if has_calendar_pattern or has_calendar_context:
+        return {"intent": "CALENDAR_QUERY", "source": "heuristic"}
+
+    # ── COURSE_INFO: فقط إذا مافيه سياق تقويم ──
     course_info_patterns = [
         r'مادة', r'اختبار', r'ميد', r'فاينل', r'درجات', r'توزيع', r'موعد'
     ]
@@ -146,7 +169,6 @@ def classify_intent_heuristic(messages: list) -> dict:
         return {"intent": "COURSE_INFO", "source": "heuristic"}
 
     return {"intent": "UNKNOWN", "source": "heuristic"}
-
 
 async def classify_intent_llm(message: str, openai_client: AsyncOpenAI) -> dict:
     system_prompt = """You are an intent classifier for a university academic assistant.
@@ -161,7 +183,7 @@ Classify the user's message into EXACTLY ONE of the following intents:
 - PLAN_OR_STUDY_ADVICE: Asking for general study advice, time management, or organizing their study plan.
 - FULL_ACADEMIC_ANALYSIS: Asking for a deep, comprehensive analysis of their entire academic record, all past courses, and broad strengths/weaknesses.
 - COURSE_INFO: Asking for course details, syllabus, project, midterm, final, exam dates, or grading policy of a specific course (e.g. by course code or name).
-
+- CALENDAR_QUERY: Asking about exam schedules (final or midterm), academic holidays, semester start/end dates, or any date from the academic calendar. This includes vague questions like "متى الاختبارات النهائية" or "موعد الفاينل".
 Return ONLY a JSON object with a single key "intent".
 Example: {"intent": "GREETING"}
 """

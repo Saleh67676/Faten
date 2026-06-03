@@ -152,7 +152,14 @@ def build_system_prompt(
 اردد بهذا النص: "أنا مختص بمساعدتك في الأمور الأكاديمية مثل المعدل، الخطة، الجدول، وجلسات المذاكرة. لهذا السؤال الأفضل الرجوع لمصدر مختص."
 في الأسئلة الطبية تحديداً أضف توجيهاً لمراجعة طبيب.
 
-مهم جداً: لا تستخدم عبارة "الأفضل الرجوع لمصدر مختص" إلا في الحالة رقم 3 فقط."""
+مهم جداً: لا تستخدم عبارة "الأفضل الرجوع لمصدر مختص" إلا في الحالة رقم 3 فقط.
+
+⚠️ استثناء حرج — التقويم الأكاديمي:
+أي سؤال عن مواعيد الاختبارات (نهائية أو نصفية)، الإجازات، أو التواريخ الجامعية
+هو سؤال أكاديمي مسموح به بالكامل — حتى لو جاء قصيراً أو عاماً.
+لا تطبّق عليه القاعدة رقم 1 أبداً.
+بدلاً من ذلك: استدعِ get_calendar_info فوراً وأجب الطالب من نتيجة الأداة."""
+
 
     GENERAL_QA_PROMPT = """تعليمات الإجابة للأسئلة العامة:
 رد بوضوح واختصار. أنت مساعد أكاديمي ومرشد جامعي.
@@ -207,7 +214,26 @@ def build_system_prompt(
 - اعرض الإجابة كقوائم نقطية (Bullet Points) منسقة وواضحة.
 - ⛔ ممنوع عرض وسوم HTML (مثل <br>) في ردك.
 - حوّل أي <br> أو مسافات HTML متبقية إلى أسطر جديدة أو قائمة نقطية.
+
+
 """
+    CALENDAR_QUERY_PROMPT = """═══ 📅 التقويم الأكاديمي ═══
+استدعِ get_calendar_info فوراً عند أي سؤال عن مواعيد أو أحداث جامعية.
+لا تجب من معرفتك العامة أبداً. لا تقل "غير متوفر" قبل استدعاء الأداة.
+
+قواعد اختيار query_type:
+- سؤال عن فصل كامل ("أحداث الفصل الأول", "كل أحداث الفصل الثاني") → query_type="by_term"
+- سؤال عن نوع حدث بدون فصل ("متى الاختبارات النهائية", "متى إجازة الخريف") → query_type="by_type" أو query_type="search"
+- سؤال عن نوع حدث + فصل محدد ("الاختبارات النصفية للفصل الثاني") → استدعِ الأداة مرتين:
+    1. query_type="by_term", query="الفصل الدراسي الثاني" → تجيب كل أحداث الفصل
+    2. فلتر النتيجة يدوياً بالكلمة المطلوبة ("نصفية") واعرضها للطالب
+- سؤال عن أقرب حدث ("وش أقرب حدث") → query_type="next_event"
+
+أنواع event_type المتاحة: exam, holiday, academic, system
+
+"""
+
+
 
     # ══════════════════════════════════════════════════
     #  Build Prompt based on Intent
@@ -230,6 +256,8 @@ def build_system_prompt(
         sections.extend([BASE_IDENTITY_PROMPT, SCOPE_POLICY_PROMPT, FORMATTING_PROMPT, ACADEMIC_ANALYSIS_PROMPT, FULL_ANALYSIS_PROTOCOL_PROMPT])
     elif intent == "COURSE_INFO":
         sections.extend([BASE_IDENTITY_PROMPT, SCOPE_POLICY_PROMPT, FORMATTING_PROMPT, COURSE_INFO_PROMPT])
+    elif intent == "CALENDAR_QUERY":
+        sections.extend([BASE_IDENTITY_PROMPT, CALENDAR_QUERY_PROMPT])
     else:
         # Fallback to mostly everything for unknown intents (safe)
         sections.extend([BASE_IDENTITY_PROMPT, SCOPE_POLICY_PROMPT, FORMATTING_PROMPT, ACADEMIC_ANALYSIS_PROMPT, FULL_ANALYSIS_PROTOCOL_PROMPT, ACTION_TOOL_PROMPT])
@@ -695,7 +723,7 @@ def build_system_prompt(
     prompt += """
 ═══ ⚡ قواعد الذكاء الاستباقي ═══
 
-🔧 صلاحياتك (14 أداة):
+🔧 صلاحياتك (15 أداة):
 1. add_upcoming_exam — تسجيل اختبار
 2. create_study_plan — إنشاء خطة مذاكرة قصيرة
 3. send_notification — إرسال تنبيه/تحفيز
@@ -710,7 +738,7 @@ def build_system_prompt(
 12. update_learning_preferences — تحديث أسلوب التعلم والتوتر
 13. generate_semester_master_plan ⭐ — إنشاء خطة فصلية ذكية مخصصة بالكامل
 14. get_course_info 📖 — بحث (قراءة فقط) عن معلومات مادة في كتالوج المواد بقاعدة البيانات
-
+15. get_calendar_info 📅 — البحث في التقويم الأكاديمي لجامعة أم القرى (تواريخ، اختبارات، إجازات).
 ═══ قواعد السلوك الذكي ═══
 1. إذا ذكر الطالب اختباراً → add_upcoming_exam فوراً + اقترح خطة مراجعة.
 2. إذا طلب "جدول فصلي" أو "خطط لي الفصل كامل" أو "نظم مذاكرتي" → generate_semester_master_plan.
@@ -737,7 +765,7 @@ def build_system_prompt(
     لماذا هذه المدة. ليس فقط "تم جدولة". مثال: "جدّلت الرياضيات
     الساعة 8 صباحاً لأنها تحتاج تركيزاً عميقاً، وموادك السهلة في
     المساء لأن طاقتك تنخفض حسب أسلوب تعلمك المسجَّل."
-
+15. إذا سأل عن مواعيد الاختبارات أو الإجازات (بصيغة عامة أو محددة) → get_calendar_info فوراً.
 ═══ قواعد التخصيص الذكي ═══
 • الخطة الفصلية يجب أن تعطي المواد الضعيفة (C أو أقل في السجل) وقتاً مضاعفاً.
 • المواد الصعبة تُجدول في وقت الذروة (حسب best_time)، السهلة في الأوقات المرنة.
